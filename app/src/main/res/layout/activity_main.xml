@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Layout chính: TabLayout + ViewPager2 -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5F5F5"
+    tools:context=".MainActivity">
+
+    <!-- Toolbar tiêu đề -->
+    <TextView
+        android:id="@+id/tvHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📋 SyncTask"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:padding="16dp"
+        android:background="@color/design_default_color_primary"
+        android:textColor="@android:color/white" />
+
+    <!-- TabLayout: 2 tab - Cá nhân | Quản lý Nhóm -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:contentDescription="Tab điều hướng"
+        android:background="@android:color/white"
+        app:tabGravity="fill"
+        app:tabMode="fixed"
+        app:tabIndicatorColor="@color/design_default_color_primary"
+        app:tabIndicatorHeight="3dp"
+        app:tabSelectedTextColor="@color/design_default_color_primary"
+        app:tabTextColor="@android:color/darker_gray" />
+
+    <!-- ViewPager2: Chứa nội dung mỗi tab -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPager"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

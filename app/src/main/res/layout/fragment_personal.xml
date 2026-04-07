@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fragment Tab Cá nhân — Material Design 3 -->
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#F2F2F7">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- ================================= -->
+        <!-- CardView 1: VIỆC CÁ NHÂN         -->
+        <!-- ================================= -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FCFCFC"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- Tiêu đề -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📋 Việc Cá nhân"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A1A2E" />
+
+                <!-- Tên việc -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:hint="Tên việc *"
+                    app:boxCornerRadiusTopStart="8dp"
+                    app:boxCornerRadiusTopEnd="8dp"
+                    app:boxCornerRadiusBottomStart="8dp"
+                    app:boxCornerRadiusBottomEnd="8dp"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPersonalTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Hạn chót + Effort trên cùng hàng -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp">
+
+                    <!-- Hạn chót -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:hint="Hạn chót *"
+                        app:boxCornerRadiusTopStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        app:startIconDrawable="@android:drawable/ic_menu_my_calendar"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etPersonalDueDate"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:focusable="false"
+                            android:cursorVisible="false"
+                            android:clickable="true"
+                            android:maxLines="1" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Effort — Exposed Dropdown Menu -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:hint="Effort"
+                        app:boxCornerRadiusTopStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/actvPersonalEffort"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:text="1"
+                            android:textSize="14sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <!-- Nút Thêm (pill shape) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddPersonalTask"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="➕ Thêm việc cá nhân"
+                    android:textAllCaps="false"
+                    app:cornerRadius="24dp"
+                    app:backgroundTint="#6C63FF" />
+
+                <!-- Đường phân cách -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="16dp"
+                    android:background="#E8E8E8" />
+
+                <!-- Counter -->
+                <TextView
+                    android:id="@+id/tvPersonalCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Danh sách: (0 việc)"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#9E9E9E" />
+
+                <!-- Empty state -->
+                <TextView
+                    android:id="@+id/tvPersonalEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Chưa có việc cá nhân."
+                    android:textSize="13sp"
+                    android:textColor="#BDBDBD"
+                    android:textAlignment="center"
+                    android:padding="20dp"
+                    android:visibility="visible" />
+
+                <!-- RecyclerView #1 -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvPersonalTasks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ================================= -->
+        <!-- CardView 2: VIỆC NHÓM (Import)    -->
+        <!-- ================================= -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FCFCFC"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- Tiêu đề -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👥 Việc từ Nhóm"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#1A1A2E" />
+
+                <!-- Nút Import (Outlined) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnImportJson"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="📥 Nhập file JSON từ Nhóm"
+                    android:textAllCaps="false"
+                    app:cornerRadius="24dp"
+                    app:strokeColor="#6C63FF"
+                    app:strokeWidth="1dp"
+                    android:textColor="#6C63FF"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+                <!-- Counter -->
+                <TextView
+                    android:id="@+id/tvGroupCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Đã nhận: (0 việc)"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#9E9E9E" />
+
+                <!-- Empty state -->
+                <TextView
+                    android:id="@+id/tvGroupEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Chưa có việc nhóm. Bấm Import để nhận."
+                    android:textSize="13sp"
+                    android:textColor="#BDBDBD"
+                    android:textAlignment="center"
+                    android:padding="20dp"
+                    android:visibility="visible" />
+
+                <!-- RecyclerView #2 -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvGroupTasks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
