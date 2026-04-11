@@ -36,7 +36,10 @@ import com.phuc.synctask.model.Quadrant
 import com.phuc.synctask.model.quadrant
 import com.phuc.synctask.ui.main.AddTaskBottomSheet
 import com.phuc.synctask.ui.group.TaskDetailBottomSheet
+import com.phuc.synctask.ui.common.DeleteConfirmationDialog
+import com.phuc.synctask.ui.common.EmptyTaskState
 import com.phuc.synctask.viewmodel.HomeViewModel
+import com.phuc.synctask.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -62,6 +65,7 @@ fun QuadrantDetailScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<FirebaseTask?>(null) }
+    var taskToDelete by remember { mutableStateOf<FirebaseTask?>(null) }
 
     val bgColor = when (quadrant) {
         Quadrant.DO_NOW -> Color(0xFFFFF0F0)
@@ -179,21 +183,11 @@ fun QuadrantDetailScreen(
 
             // ── BODY ──
             if (allTasks.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .background(bgColor, RoundedCornerShape(16.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(qIcon, contentDescription = null, tint = accentColor, modifier = Modifier.size(32.dp))
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Không có task nào", fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                        Text("Mọi thứ đang rất ổn thỏa!", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+                EmptyTaskState(
+                    imageResId = R.drawable.ic_empty_state_personal,
+                    title      = "Yay! Bạn đang rảnh rỗi!",
+                    subtitle   = "Hãy bấm nút + để tạo nhiệm vụ đầu tiên nhé."
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -221,7 +215,7 @@ fun QuadrantDetailScreen(
                             QuadrantTaskCard(
                                 task = task,
                                 accentColor = accentColor,
-                                onDelete = { viewModel.deleteTask(task.id) },
+                                onDelete = { taskToDelete = task },
                                 onToggle = {
                                     if (!task.isCompleted) showConfetti = true
                                     viewModel.toggleTaskStatus(task)
@@ -252,7 +246,7 @@ fun QuadrantDetailScreen(
                             QuadrantTaskCard(
                                 task = task,
                                 accentColor = accentColor,
-                                onDelete = { viewModel.deleteTask(task.id) },
+                                onDelete = { taskToDelete = task },
                                 onToggle = { viewModel.toggleTaskStatus(task) },
                                 onClick = { selectedTask = task }
                             )
@@ -289,7 +283,19 @@ fun QuadrantDetailScreen(
             onDismiss = { selectedTask = null }
         )
     }
-    
+
+    // Dialog xác nhận xóa
+    taskToDelete?.let { task ->
+        DeleteConfirmationDialog(
+            taskTitle = task.title,
+            onConfirm = {
+                viewModel.deleteTask(task.id)
+                taskToDelete = null
+            },
+            onDismiss = { taskToDelete = null }
+        )
+    }
+
     if (showConfetti) {
         val party = Party(
             speed = 0f,

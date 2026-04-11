@@ -190,6 +190,39 @@ class GroupTaskViewModel : ViewModel() {
         database.reference.child("groupTasks").child(groupId).child(taskId).removeValue()
     }
 
+    /**
+     * Owner → xóa toàn bộ group + groupTasks.
+     * Member → chỉ xóa uid khỏi mảng members.
+     * [onComplete] được gọi khi xong để UI điều hướng về.
+     */
+    fun leaveOrDeleteGroup(groupId: String, onComplete: () -> Unit) {
+        val uid = currentUserId ?: return
+        val isOwner = uid == _group.value?.ownerId
+
+        if (isOwner) {
+            // Xóa tất cả task con trước, rồi xóa group
+            database.reference.child("groupTasks").child(groupId).removeValue()
+                .addOnCompleteListener {
+                    database.reference.child("groups").child(groupId).removeValue()
+                        .addOnCompleteListener { onComplete() }
+                }
+        } else {
+            // Lấy danh sách members hiện tại rồi loại uid ra
+            database.reference.child("groups").child(groupId)
+                .child("members")
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    @Suppress("UNCHECKED_CAST")
+                    val members = (snapshot.value as? List<String>)?.toMutableList()
+                        ?: mutableListOf()
+                    members.remove(uid)
+                    database.reference.child("groups").child(groupId)
+                        .child("members").setValue(members)
+                        .addOnCompleteListener { onComplete() }
+                }
+        }
+    }
+
     private fun cleanup() {
         currentGroupId?.let { gid ->
             groupListener?.let {

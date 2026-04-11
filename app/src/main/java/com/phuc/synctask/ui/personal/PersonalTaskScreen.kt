@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.luminance
 
 @Composable
 fun PersonalTaskScreen(
@@ -44,11 +45,13 @@ fun PersonalTaskScreen(
 
     val isLoading = uiState is HomeUiState.Loading
 
-    // Crossfade mượt mà giữa loading và nội dung (300ms)
+    // Crossfade 2 trạng thái: loading / content
+    // 4 ô ma trận LUÔN hiển thị kể cả khi count = 0
+    // EmptyTaskState chỉ hiện trong QuadrantDetailScreen (màn hình danh sách con)
     Crossfade(
         targetState = isLoading,
         animationSpec = tween(durationMillis = 300),
-        label = "personal_loading"
+        label = "personal_state"
     ) { loading ->
         if (loading) {
             AnimatedLoadingScreen(message = "Đang đồng bộ công việc...")
@@ -127,7 +130,7 @@ fun PersonalTaskScreen(
             }
             Spacer(modifier = Modifier.height(80.dp))
         }
-    }
+    } // Crossfade
 }
 
 @Composable

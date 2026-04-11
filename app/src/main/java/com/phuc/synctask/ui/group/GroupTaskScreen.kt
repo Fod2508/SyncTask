@@ -17,7 +17,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,6 +40,9 @@ import com.phuc.synctask.ui.main.getAvatarColor
 import com.phuc.synctask.ui.main.getInitials
 import com.phuc.synctask.viewmodel.GroupTaskViewModel
 import com.phuc.synctask.ui.common.AnimatedLoadingScreen
+import com.phuc.synctask.ui.common.DeleteConfirmationDialog
+import com.phuc.synctask.ui.common.EmptyTaskState
+import com.phuc.synctask.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,6 +80,8 @@ fun GroupTaskScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<GroupTask?>(null) }
+    var taskToDelete by remember { mutableStateOf<GroupTask?>(null) }
+    var showLeaveDialog by remember { mutableStateOf(false) }
 
     var showGroupConfetti by remember { mutableStateOf(false) }
     LaunchedEffect(showGroupConfetti) {
@@ -111,6 +118,44 @@ fun GroupTaskScreen(
                             contentDescription = "Quay lại",
                             tint = Color.White
                         )
+                    }
+                },
+                actions = {
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = "Tùy chọn",
+                                tint = Color.White
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = if (isOwner) "Giải tán nhóm" else "Rời nhóm",
+                                        color = DangerRed,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (isOwner) Icons.Filled.DeleteOutline
+                                                      else Icons.Filled.ExitToApp,
+                                        contentDescription = null,
+                                        tint = DangerRed
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    showLeaveDialog = true
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -162,18 +207,11 @@ fun GroupTaskScreen(
             // ─── Section 3: Task Cards (Activity Feed) ───
             if (tasks.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Chưa có công việc nào.\nBấm \"Task Mới\" để bắt đầu!",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    EmptyTaskState(
+                        imageResId = R.drawable.ic_empty_state_group,
+                        title      = "Chưa có dự án nào!",
+                        subtitle   = "Hãy bấm nút + để tạo dự án nhóm mới và giao việc."
+                    )
                 }
             } else {
                 items(items = tasks, key = { it.id.ifBlank { it.hashCode() } }) { task ->
@@ -189,7 +227,7 @@ fun GroupTaskScreen(
                             }
                             viewModel.toggleTaskStatus(groupId, task)
                         },
-                        onDelete = { viewModel.deleteGroupTask(groupId, task.id) },
+                        onDelete = { taskToDelete = task },
                         onClick = { selectedTask = task }
                     )
                 }
@@ -245,6 +283,31 @@ fun GroupTaskScreen(
             description = task.description,
             dueDate = task.dueDate,
             onDismiss = { selectedTask = null }
+        )
+    }
+
+    // ─── Dialog xác nhận xóa ───
+    taskToDelete?.let { task ->
+        DeleteConfirmationDialog(
+            taskTitle = task.title,
+            onConfirm = {
+                viewModel.deleteGroupTask(groupId, task.id)
+                taskToDelete = null
+            },
+            onDismiss = { taskToDelete = null }
+        )
+    }
+
+    // ─── Dialog rời / giải tán nhóm ───
+    if (showLeaveDialog) {
+        LeaveGroupDialog(
+            isOwner = isOwner,
+            groupName = group?.name ?: "nhóm",
+            onConfirm = {
+                showLeaveDialog = false
+                viewModel.leaveOrDeleteGroup(groupId) { onBack() }
+            },
+            onDismiss = { showLeaveDialog = false }
         )
     }
 }
@@ -824,6 +887,91 @@ fun TaskDetailBottomSheet(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Đóng", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────
+// Leave / Delete Group Confirmation Dialog
+// ───────────────────────────────────────────
+@Composable
+private fun LeaveGroupDialog(
+    isOwner: Boolean,
+    groupName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .padding(vertical = 24.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Hình minh họa tái sử dụng ic_delete_confirm
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_delete_confirm),
+                    contentDescription = null,
+                    modifier = Modifier.size(110.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = if (isOwner) "Giải tán nhóm?" else "Rời khỏi nhóm?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = if (isOwner)
+                        "Hành động này sẽ xóa toàn bộ dữ liệu công việc của nhóm \"$groupName\". Bạn có chắc chắn?"
+                    else
+                        "Bạn sẽ không thể xem hay chỉnh sửa công việc của nhóm \"$groupName\" nữa.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Hủy")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text(
+                            text = if (isOwner) "Giải tán" else "Rời nhóm",
+                            color = MaterialTheme.colorScheme.onError
+                        )
+                    }
+                }
             }
         }
     }
