@@ -95,6 +95,9 @@ dependencies {
     // Lottie Compose
     implementation(libs.lottie.compose)
 
+    // DataStore Preferences
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Play Services Auth (Google Sign-In)
     implementation(libs.play.services.auth)
 }

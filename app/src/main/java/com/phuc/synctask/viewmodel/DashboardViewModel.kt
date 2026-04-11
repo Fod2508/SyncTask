@@ -17,9 +17,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
-import java.util.Calendar
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
+import java.time.DayOfWeek
+import java.time.temporal.TemporalAdjusters
 
 enum class DashboardFilter {
     WEEK, MONTH
@@ -157,38 +160,32 @@ class DashboardViewModel : ViewModel() {
         val uid = auth.currentUser?.uid ?: return
         val now = System.currentTimeMillis()
 
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
 
         val startTime: Long
         val endTime: Long
         val labels: List<String>
-        val stepDays: Int
 
         if (filter == DashboardFilter.WEEK) {
-            calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            startTime = calendar.timeInMillis
-            calendar.add(Calendar.DAY_OF_YEAR, 7)
-            endTime = calendar.timeInMillis
+            // Tuần bắt đầu từ Thứ Hai (chuẩn ISO)
+            val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            val weekEnd = weekStart.plusDays(7)
+            startTime = weekStart.atStartOfDay(zone).toInstant().toEpochMilli()
+            endTime = weekEnd.atStartOfDay(zone).toInstant().toEpochMilli()
             labels = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
-            stepDays = 1
         } else {
-            calendar.set(Calendar.DAY_OF_MONTH, 1)
-            startTime = calendar.timeInMillis
-            calendar.add(Calendar.MONTH, 1)
-            endTime = calendar.timeInMillis
-            // For month, we might want to aggregate by week or specific intervals
+            val monthStart = today.withDayOfMonth(1)
+            val monthEnd = monthStart.plusMonths(1)
+            startTime = monthStart.atStartOfDay(zone).toInstant().toEpochMilli()
+            endTime = monthEnd.atStartOfDay(zone).toInstant().toEpochMilli()
             labels = listOf("Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4", "Tuần 5")
-            stepDays = 7
         }
 
-        // Filtering tasks within period
+        // Filtering tasks within period — dùng createdAt (timestamp) làm fallback khi dueDate == null
         val inRangePersonal = pTasks.filter { (it.dueDate ?: it.timestamp) in startTime until endTime }
-        val inRangeGroup = gTasksMap.values.flatten().filter { 
-            it.assignedToId == uid && (it.dueDate ?: it.timestamp) in startTime until endTime 
+        val inRangeGroup = gTasksMap.values.flatten().filter {
+            it.assignedToId == uid && (it.dueDate ?: it.timestamp) in startTime until endTime
         }
 
         // 1. Basic Stats
@@ -224,14 +221,22 @@ class DashboardViewModel : ViewModel() {
 
         // 3. Workload Stats (Stacked Bar Chart Data)
         val workloadList = mutableListOf<DailyWorkload>()
-        val cal = Calendar.getInstance()
         if (filter == DashboardFilter.WEEK) {
+            // index 0 = Monday (dayOfWeek.value=1), index 6 = Sunday (dayOfWeek.value=7)
             for (i in 0..6) {
-                val targetDay = if (i == 6) Calendar.SUNDAY else i + 2
-                val pDone = inRangePersonal.count { it.isCompleted && getDayOfWeek(it.dueDate ?: it.timestamp) == targetDay }
-                val gDone = inRangeGroup.count { it.isCompleted && getDayOfWeek(it.dueDate ?: it.timestamp) == targetDay }
-                val overdue = inRangePersonal.count { !it.isCompleted && it.dueDate != null && it.dueDate!! < now && getDayOfWeek(it.dueDate!!) == targetDay } +
-                              inRangeGroup.count { !it.isCompleted && it.dueDate != null && it.dueDate!! < now && getDayOfWeek(it.dueDate!!) == targetDay }
+                val pDone = inRangePersonal.count {
+                    it.isCompleted && getLocalDayIndex(it.dueDate ?: it.timestamp, zone) == i
+                }
+                val gDone = inRangeGroup.count {
+                    it.isCompleted && getLocalDayIndex(it.dueDate ?: it.timestamp, zone) == i
+                }
+                val overdue = inRangePersonal.count {
+                    !it.isCompleted && it.dueDate != null && it.dueDate!! < now &&
+                        getLocalDayIndex(it.dueDate!!, zone) == i
+                } + inRangeGroup.count {
+                    !it.isCompleted && it.dueDate != null && it.dueDate!! < now &&
+                        getLocalDayIndex(it.dueDate!!, zone) == i
+                }
                 workloadList.add(DailyWorkload(labels[i], pDone, gDone, overdue))
             }
         } else {
@@ -246,7 +251,7 @@ class DashboardViewModel : ViewModel() {
                 workloadList.add(DailyWorkload(labels[i], pDone, gDone, overdue))
             }
         }
-        _weeklyWorkload.value = workloadList
+        _weeklyWorkload.value = workloadList.toList()
 
         // 4. Group Progress
         _groupProgress.value = groups.map { group ->
@@ -275,10 +280,13 @@ class DashboardViewModel : ViewModel() {
         _isLoading.value = false
     }
 
-    private fun getDayOfWeek(time: Long): Int {
-        val c = Calendar.getInstance()
-        c.timeInMillis = time
-        return c.get(Calendar.DAY_OF_WEEK)
+    /**
+     * Trả về index 0-6 theo chuẩn ISO: Monday=0, Tuesday=1, ..., Sunday=6
+     * Dùng LocalDate.dayOfWeek.value (Mon=1..Sun=7) rồi trừ 1.
+     */
+    private fun getLocalDayIndex(time: Long, zone: ZoneId): Int {
+        val date = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
+        return date.dayOfWeek.value - 1  // Mon=0 ... Sun=6
     }
 
     private fun getDeadlineStatus(dueDate: Long?, now: Long): String {

@@ -12,10 +12,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +26,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,11 +51,16 @@ import com.phuc.synctask.ui.group.GroupTaskScreen
 import com.phuc.synctask.ui.navigation.Screen
 import com.phuc.synctask.ui.personal.PersonalTaskScreen
 import com.phuc.synctask.viewmodel.HomeViewModel
+import com.phuc.synctask.viewmodel.ThemeViewModel
 import com.phuc.synctask.model.Quadrant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onLogout: () -> Unit = {}) {
+fun MainScreen(
+    themeViewModel: ThemeViewModel,
+    onLogout: () -> Unit = {}
+) {
+    val isDark by themeViewModel.isDarkTheme.collectAsState()
     val navController = rememberNavController()
     val homeViewModel: HomeViewModel = viewModel()
     val screens = listOf(
@@ -103,6 +112,12 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         }
                     },
                     actions = {
+                        IconButton(onClick = { themeViewModel.toggleTheme() }) {
+                            Icon(
+                                imageVector = if (isDark) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
+                                contentDescription = if (isDark) "Chuyển sang sáng" else "Chuyển sang tối"
+                            )
+                        }
                         IconButton(onClick = onLogout) {
                             Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Đăng xuất")
                         }
@@ -110,10 +125,16 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                 )
             }
         },
-        floatingActionButtonPosition = FabPosition.Center,
+        floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
             if (currentRoute == Screen.Personal.route) {
-                FloatingActionButton(onClick = { showAddSheet = true }) {
+                FloatingActionButton(
+                    onClick = { showAddSheet = true },
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 8.dp,
+                        pressedElevation = 12.dp
+                    )
+                ) {
                     Icon(Icons.Filled.Add, contentDescription = "Thêm công việc")
                 }
             }
@@ -124,11 +145,6 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     containerColor = MaterialTheme.colorScheme.surface
                 ) {
                     screens.forEachIndexed { index, screen ->
-                        // Nếu số lượng tab chẵn, FAB ở giữa
-                        // Hiện tại có 3 tab: index 0, 1 (Group), 2. Thêm Spacer sau Group (index 1) để tạo khoảng trống cho FAB
-                        if (index == 2) {
-                            Spacer(modifier = Modifier.weight(0.5f))
-                        }
                         NavigationBarItem(
                             icon = { Icon(screen.icon, contentDescription = screen.title) },
                             label = { Text(screen.title) },

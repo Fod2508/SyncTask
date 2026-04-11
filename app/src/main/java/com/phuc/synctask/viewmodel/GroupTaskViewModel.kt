@@ -1,6 +1,7 @@
 package com.phuc.synctask.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -8,9 +9,11 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.phuc.synctask.model.Group
 import com.phuc.synctask.model.GroupTask
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * ViewModel quản lý dữ liệu cho một nhóm cụ thể (group tasks, members, group info).
@@ -35,6 +38,12 @@ class GroupTaskViewModel : ViewModel() {
     private val _tasks = MutableStateFlow<List<GroupTask>>(emptyList())
     val tasks: StateFlow<List<GroupTask>> = _tasks.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    // Đảm bảo branded loading hiển thị tối thiểu 1500ms
+    private var loadStartTime = 0L
+
     private var groupListener: ValueEventListener? = null
     private var tasksListener: ValueEventListener? = null
     private var currentGroupId: String? = null
@@ -42,6 +51,7 @@ class GroupTaskViewModel : ViewModel() {
     fun loadGroup(groupId: String) {
         if (groupId == currentGroupId) return
         currentGroupId = groupId
+        loadStartTime = System.currentTimeMillis()
 
         // Clean up old listeners
         cleanup()
@@ -99,6 +109,13 @@ class GroupTaskViewModel : ViewModel() {
                 }
                 taskList.sortByDescending { it.timestamp }
                 _tasks.value = taskList
+                // Branded loading: đảm bảo hiển thị tối thiểu 1500ms
+                viewModelScope.launch {
+                    val elapsed = System.currentTimeMillis() - loadStartTime
+                    val remaining = 1500L - elapsed
+                    if (remaining > 0) delay(remaining)
+                    _isLoading.value = false
+                }
             }
 
             override fun onCancelled(error: DatabaseError) {}

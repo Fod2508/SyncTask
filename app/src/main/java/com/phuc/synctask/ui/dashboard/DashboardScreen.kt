@@ -31,15 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.random.Random
 
-// ─── Design Tokens ───
-private val ScreenBackground = Color(0xFFF8FAFC)
-private val CardBackground = Color.White
-private val PersonalBlue = Color(0xFF3B82F6)
+// ─── Design Tokens (semantic — dùng MaterialTheme trong Composable) ───
+// Các màu chức năng cố định (không phụ thuộc theme) giữ nguyên
+private val PersonalBlue      = Color(0xFF3B82F6)
 private val PersonalBlueLight = Color(0xFFEFF6FF)
-private val GroupOrange = Color(0xFFF97316)
-private val GroupOrangeLight = Color(0xFFFFF7ED)
-private val SubtleText = Color(0xFF64748B)
-private val TextPrimary = Color(0xFF0F172A)
+private val GroupOrange       = Color(0xFFF97316)
+private val GroupOrangeLight  = Color(0xFFFFF7ED)
 
 // Mảng màu cho Donut Chart
 private val DonutColors = listOf(
@@ -69,10 +66,10 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScreenBackground)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(scrollState)
             .padding(16.dp)
-            .padding(bottom = 80.dp) // padding để không bị che bởi BottomBar
+            .padding(bottom = 80.dp)
     ) {
         // ─── 1. Header & Tổng quan ───
         Row(
@@ -84,7 +81,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                 "Thống kê",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onBackground
             )
             Box {
                 OutlinedButton(
@@ -92,8 +89,8 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                     shape = RoundedCornerShape(20.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                 ) {
-                    Text(if (filterType == DashboardFilter.WEEK) "Tuần này" else "Tháng này", color = TextPrimary)
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = TextPrimary)
+                    Text(if (filterType == DashboardFilter.WEEK) "Tuần này" else "Tháng này")
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                 }
                 DropdownMenu(
                     expanded = showFilterMenu,
@@ -153,7 +150,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
             "Cân bằng Công việc",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
         StackedBarChart(weeklyWorkload = weeklyWorkload, modifier = Modifier.fillMaxWidth().height(200.dp))
@@ -165,7 +162,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
             "Phân bổ Cá nhân (Eisenhower)",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
         DonutChartCard(eisenhowerStats = eisenhowerStats, modifier = Modifier.fillMaxWidth())
@@ -177,7 +174,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
             "Tiến độ Dự án",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
         GroupProgressList(progressList = groupProgress)
@@ -189,7 +186,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
             "Tiêu điểm cần xử lý",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(16.dp))
         FocusTasksList(focusTasks = pendingFocusTasks)
@@ -233,10 +230,11 @@ fun StackedBarChart(weeklyWorkload: List<DailyWorkload>, modifier: Modifier = Mo
     if (weeklyWorkload.isEmpty()) return
 
     val maxCount = weeklyWorkload.maxOf { it.personalCount + it.groupCount + it.overdueCount }.coerceAtLeast(1)
+    val subtleText = MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
@@ -311,7 +309,7 @@ fun StackedBarChart(weeklyWorkload: List<DailyWorkload>, modifier: Modifier = Mo
                     Text(
                         text = day.label,
                         style = MaterialTheme.typography.bodySmall,
-                        color = SubtleText,
+                        color = subtleText,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -324,10 +322,12 @@ fun StackedBarChart(weeklyWorkload: List<DailyWorkload>, modifier: Modifier = Mo
 fun DonutChartCard(eisenhowerStats: List<EisenhowerData>, modifier: Modifier = Modifier) {
     val totalTasks = eisenhowerStats.sumOf { it.totalCount }
     val completedTasks = eisenhowerStats.sumOf { it.completedCount }
+    val subtleText = MaterialTheme.colorScheme.onSurfaceVariant
+    val textPrimary = MaterialTheme.colorScheme.onSurface
 
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
@@ -393,20 +393,20 @@ fun DonutChartCard(eisenhowerStats: List<EisenhowerData>, modifier: Modifier = M
                             text = "0 / 0",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = SubtleText
+                            color = subtleText
                         )
                     } else {
                         Text(
                             text = "$completedTasks / $totalTasks",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+                            color = textPrimary
                         )
                     }
                     Text(
                         text = "Tiến độ",
                         style = MaterialTheme.typography.bodySmall,
-                        color = SubtleText
+                        color = subtleText
                     )
                 }
             }
@@ -431,7 +431,7 @@ fun DonutChartCard(eisenhowerStats: List<EisenhowerData>, modifier: Modifier = M
                         Text(
                             text = labelText,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextPrimary,
+                            color = textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -444,10 +444,12 @@ fun DonutChartCard(eisenhowerStats: List<EisenhowerData>, modifier: Modifier = M
 
 @Composable
 fun GroupProgressList(progressList: List<GroupProgressData>) {
+    val subtleText = MaterialTheme.colorScheme.onSurfaceVariant
+    val textPrimary = MaterialTheme.colorScheme.onSurface
     if (progressList.isEmpty()) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(12.dp)
         ) {
             Box(
@@ -456,7 +458,7 @@ fun GroupProgressList(progressList: List<GroupProgressData>) {
             ) {
                 Text(
                     text = "Bạn chưa tham gia dự án nào",
-                    color = SubtleText,
+                    color = subtleText,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -468,7 +470,7 @@ fun GroupProgressList(progressList: List<GroupProgressData>) {
         progressList.forEach { p ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -480,7 +482,7 @@ fun GroupProgressList(progressList: List<GroupProgressData>) {
                         Text(
                             text = p.groupName,
                             fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary,
+                            color = textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
@@ -510,7 +512,7 @@ fun GroupProgressList(progressList: List<GroupProgressData>) {
                     Text(
                         text = "Bạn đóng góp: ${p.userContributions} task",
                         style = MaterialTheme.typography.bodySmall,
-                        color = SubtleText
+                        color = subtleText
                     )
                 }
             }
@@ -520,10 +522,12 @@ fun GroupProgressList(progressList: List<GroupProgressData>) {
 
 @Composable
 fun FocusTasksList(focusTasks: List<FocusTask>) {
+    val subtleText = MaterialTheme.colorScheme.onSurfaceVariant
+    val textPrimary = MaterialTheme.colorScheme.onSurface
     if (focusTasks.isEmpty()) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(12.dp)
         ) {
             Box(
@@ -544,7 +548,7 @@ fun FocusTasksList(focusTasks: List<FocusTask>) {
         focusTasks.forEach { task ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
@@ -557,14 +561,14 @@ fun FocusTasksList(focusTasks: List<FocusTask>) {
                         Text(
                             text = task.title,
                             fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
+                            color = textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = task.origin,
                             style = MaterialTheme.typography.bodySmall,
-                            color = SubtleText
+                            color = subtleText
                         )
                     }
                     

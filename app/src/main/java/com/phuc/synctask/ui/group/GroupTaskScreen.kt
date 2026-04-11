@@ -37,6 +37,7 @@ import com.phuc.synctask.model.GroupTask
 import com.phuc.synctask.ui.main.getAvatarColor
 import com.phuc.synctask.ui.main.getInitials
 import com.phuc.synctask.viewmodel.GroupTaskViewModel
+import com.phuc.synctask.ui.common.AnimatedLoadingScreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,15 +48,11 @@ import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
 import java.util.concurrent.TimeUnit
 
-// ─── Design Tokens ───
+// ─── Design Tokens (màu chức năng cố định giữ nguyên) ───
 private val IndigoPrimary = Color(0xFF4B3FBE)
-private val IndigoLight = Color(0xFF6C63FF)
-private val ScreenBackground = Color(0xFFF8FAFC)
-private val CardBackground = Color.White
-private val SubtleText = Color(0xFF94A3B8)
-private val SuccessGreen = Color(0xFF22C55E)
-private val WarnYellow = Color(0xFFEAB308)
-private val DangerRed = Color(0xFFEF4444)
+private val SuccessGreen  = Color(0xFF22C55E)
+private val WarnYellow    = Color(0xFFEAB308)
+private val DangerRed     = Color(0xFFEF4444)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +69,7 @@ fun GroupTaskScreen(
     val group by viewModel.group.collectAsState()
     val memberNames by viewModel.memberNames.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val currentUid = viewModel.currentUserId
     val isOwner = currentUid != null && currentUid == group?.ownerId
 
@@ -86,9 +84,15 @@ fun GroupTaskScreen(
         }
     }
 
+    // Hiển thị loading screen khi chưa có dữ liệu lần đầu
+    if (isLoading) {
+        AnimatedLoadingScreen(message = "Đang tải nhóm...")
+        return
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            containerColor = ScreenBackground,
+            containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -148,7 +152,7 @@ fun GroupTaskScreen(
                 Text(
                     text = "BẢNG TIN HOẠT ĐỘNG",
                     style = MaterialTheme.typography.labelMedium,
-                    color = SubtleText,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.5.sp,
                     modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 8.dp)
@@ -166,7 +170,7 @@ fun GroupTaskScreen(
                     ) {
                         Text(
                             "Chưa có công việc nào.\nBấm \"Task Mới\" để bắt đầu!",
-                            color = SubtleText,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -302,7 +306,7 @@ private fun ProductivityRingsSection(
                     initials = initials,
                     name = name,
                     progress = animatedProgress,
-                    ringColor = if (memberTasks.isEmpty()) SubtleText else ringColor,
+                    ringColor = if (memberTasks.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else ringColor,
                     isOwner = uid == ownerId
                 )
             }
@@ -404,7 +408,7 @@ private fun ActivityFeedCard(
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -416,7 +420,7 @@ private fun ActivityFeedCard(
                 } else {
                     "?"
                 }
-                val avatarColor = if (isAssigned) getAvatarColor(assignedName ?: "?") else SubtleText.copy(alpha = 0.3f)
+                val avatarColor = if (isAssigned) getAvatarColor(assignedName ?: "?") else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                 Box(
                     modifier = Modifier
                         .size(32.dp)
@@ -441,7 +445,7 @@ private fun ActivityFeedCard(
                     Text(
                         text = statusText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (task.isCompleted) SuccessGreen else SubtleText,
+                        color = if (task.isCompleted) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -460,7 +464,7 @@ private fun ActivityFeedCard(
                     onCheckedChange = { onToggle() },
                     colors = CheckboxDefaults.colors(
                         checkedColor = IndigoPrimary,
-                        uncheckedColor = SubtleText
+                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
             }
@@ -473,7 +477,7 @@ private fun ActivityFeedCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (task.isCompleted)
-                    SubtleText
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 else
                     MaterialTheme.colorScheme.onSurface,
                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
@@ -486,7 +490,7 @@ private fun ActivityFeedCard(
                 Text(
                     text = task.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = SubtleText,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -710,7 +714,7 @@ private fun AddGroupTaskSheet(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.width(56.dp),
                             textAlign = TextAlign.Center,
-                            color = if (isSelected) IndigoPrimary else SubtleText
+                            color = if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -764,7 +768,7 @@ fun TaskDetailBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -790,7 +794,7 @@ fun TaskDetailBottomSheet(
             Text(
                 text = if (description.isNotBlank()) description else "Không có mô tả thêm",
                 style = MaterialTheme.typography.bodyMedium,
-                color = SubtleText
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -809,7 +813,7 @@ fun TaskDetailBottomSheet(
             Text(
                 text = "Hạn chót: $dateText",
                 style = MaterialTheme.typography.bodyMedium,
-                color = SubtleText
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             Spacer(modifier = Modifier.height(32.dp))

@@ -31,7 +31,7 @@ class AuthActivity : ComponentActivity() {
         }
 
         setContent {
-            SyncTaskTheme {
+            SyncTaskTheme(useDarkTheme = false) {
                 var showLogin by remember { mutableStateOf(true) }
 
                 if (showLogin) {
