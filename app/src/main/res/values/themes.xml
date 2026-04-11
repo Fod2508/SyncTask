@@ -1,8 +1,13 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!-- Base application theme — NoActionBar (dùng MaterialToolbar thay thế) -->
     <style name="Base.Theme.SyncTask" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <!-- Brand colors -->
+        <item name="colorPrimary">@color/toolbar_bg</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <!-- Status bar đồng bộ với toolbar -->
+        <item name="android:statusBarColor">@color/toolbar_bg_dark</item>
+        <item name="android:navigationBarColor">@color/white</item>
     </style>
 
     <style name="Theme.SyncTask" parent="Base.Theme.SyncTask" />

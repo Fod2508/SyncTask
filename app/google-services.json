@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "881578175396",
+    "firebase_url": "https://synctask-36239-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "synctask-36239",
+    "storage_bucket": "synctask-36239.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:881578175396:android:b5f4b14d1711f679f3af31",
+        "android_client_info": {
+          "package_name": "com.phuc.synctask"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "881578175396-r081rtdn7vf26ke2sovh2btfn3g1qvmo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.phuc.synctask",
+            "certificate_hash": "52e59affc3c577a0c2120a59aa5d16da97804154"
+          }
+        },
+        {
+          "client_id": "881578175396-m1cnbge343brei9l58k2bjm41hterko1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVmPnwAQq2NnhxNWSjR8Mf7fICNaE9lIw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "881578175396-m1cnbge343brei9l58k2bjm41hterko1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

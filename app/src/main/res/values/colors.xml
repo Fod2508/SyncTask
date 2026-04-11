@@ -2,4 +2,12 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- SyncTask Brand Colors -->
+    <color name="toolbar_bg">#6C63FF</color>
+    <color name="toolbar_bg_dark">#5A52E0</color>
+    <color name="tab_indicator">#6C63FF</color>
+    <color name="tab_selected">#6C63FF</color>
+    <color name="tab_unselected">#9E9E9E</color>
+    <color name="surface_bg">#F2F2F7</color>
 </resources>

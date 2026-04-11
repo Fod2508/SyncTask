@@ -1,7 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!-- Base application theme (Dark/Night) -->
     <style name="Base.Theme.SyncTask" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <!-- Brand colors cho dark mode -->
+        <item name="colorPrimary">@color/toolbar_bg</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <item name="android:statusBarColor">@color/toolbar_bg_dark</item>
+        <item name="android:navigationBarColor">#1A1A2E</item>
     </style>
 </resources>

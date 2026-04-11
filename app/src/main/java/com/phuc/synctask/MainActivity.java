@@ -50,6 +50,11 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
+        // ════════════════════════════════════════════
+        // Header tùy chỉnh — không cần setSupportActionBar()
+        // (toolbar đã được thay bằng plain LinearLayout header)
+        // ════════════════════════════════════════════
+
         // Thiết lập TabLayout + ViewPager2
         setupTabsAndViewPager();
 

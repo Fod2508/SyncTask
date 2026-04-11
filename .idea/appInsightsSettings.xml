@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.phuc.synctask" />
+                  <option name="mobileSdkAppId" value="1:881578175396:android:b5f4b14d1711f679f3af31" />
+                  <option name="projectId" value="synctask-36239" />
+                  <option name="projectNumber" value="881578175396" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
