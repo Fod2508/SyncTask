@@ -1,9 +1,9 @@
 package com.phuc.synctask.ui.auth
 
-import android.content.Intent
-
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -12,23 +12,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
 import com.airbnb.lottie.compose.*
-import com.phuc.synctask.MainActivity
 import com.phuc.synctask.viewmodel.AuthState
 import com.phuc.synctask.viewmodel.AuthViewModel
 
 @Composable
 fun RegisterScreen(
     viewModel: AuthViewModel,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onRegisterSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -40,11 +41,7 @@ fun RegisterScreen(
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
-                // Điều hướng sang MainActivity sau khi tạo acc thành công
-                val intent = Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                }
-                context.startActivity(intent)
+                onRegisterSuccess()
             }
             is AuthState.Error -> {
                 snackbarHostState.showSnackbar((authState as AuthState.Error).message)
@@ -54,7 +51,7 @@ fun RegisterScreen(
         }
     }
 
-    // Lottie Animation (đăng ký animation)
+    // Lottie Animation
     val lottieComposition by rememberLottieComposition(
         LottieCompositionSpec.Url("https://assets9.lottiefiles.com/packages/lf20_dn6rwtwl.json")
     )
@@ -70,69 +67,110 @@ fun RegisterScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Spacer(modifier = Modifier.height(32.dp))
+
             LottieAnimation(
                 composition = lottieComposition,
                 progress = { lottieProgress },
-                modifier = Modifier.size(250.dp)
+                modifier = Modifier.size(220.dp)
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = "Tạo Tài Khoản",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 24.dp)
             )
+
+            OutlinedTextField(
+                value = fullName,
+                onValueChange = {
+                    fullName = it
+                    if (authState is AuthState.Error) viewModel.resetState()
+                },
+                label = { Text("Họ và Tên") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    if (authState is AuthState.Error) viewModel.resetState()
+                },
                 label = { Text("Email") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
             )
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    if (authState is AuthState.Error) viewModel.resetState()
+                },
                 label = { Text("Mật khẩu") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    val desc = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                        Icon(imageVector = image, contentDescription = desc)
                     }
                 },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
             )
 
+            Spacer(modifier = Modifier.height(24.dp))
+
             Button(
-                onClick = { viewModel.registerWithEmail(email, password) },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                enabled = authState != AuthState.Loading
+                onClick = { viewModel.registerWithEmail(fullName, email, password) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                enabled = authState != AuthState.Loading,
+                shape = MaterialTheme.shapes.medium
             ) {
                 if (authState == AuthState.Loading) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
                 } else {
                     Text("Đăng ký", fontSize = 16.sp)
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Đã có tài khoản?")
+                Text("Đã có tài khoản?", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onNavigateToLogin) {
-                    Text("Đăng nhập ngay")
+                    Text("Đăng nhập ngay", fontWeight = FontWeight.Bold)
                 }
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

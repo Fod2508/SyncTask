@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.ksp)
 
     id("com.google.gms.google-services")
 }
@@ -44,34 +45,40 @@ android {
 }
 
 dependencies {
+    // AndroidX Core
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
-    implementation(libs.constraintlayout)
 
-    // Room Persistence Library
+    // Room Persistence Library (KSP for Kotlin)
     implementation(libs.room.runtime)
-    annotationProcessor(libs.room.compiler)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     // Gson - JSON parser
     implementation(libs.gson)
+    
+    // OkHttp cho việc gửi POST request FCM
+    implementation(libs.okhttp)
 
-    // UI Components
-    implementation(libs.cardview)
-    implementation(libs.recyclerview)
-    implementation(libs.viewpager2)
+    // Konfetti cho hiệu ứng pháo hoa
+    implementation(libs.konfetti.compose)
 
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
 
+    // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.8.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
+    implementation("com.google.firebase:firebase-messaging")
 
+    // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Compose dependencies
+    // Compose
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -82,12 +89,12 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    
+
     // Lottie Compose
     implementation(libs.lottie.compose)
-    
-    // Play Services Auth
-    implementation(libs.play.services.auth)
 
+    // Play Services Auth (Google Sign-In)
+    implementation(libs.play.services.auth)
 }
