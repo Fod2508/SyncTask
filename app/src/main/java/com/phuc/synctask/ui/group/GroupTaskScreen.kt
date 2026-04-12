@@ -42,6 +42,7 @@ import com.phuc.synctask.viewmodel.GroupTaskViewModel
 import com.phuc.synctask.ui.common.AnimatedLoadingScreen
 import com.phuc.synctask.ui.common.DeleteConfirmationDialog
 import com.phuc.synctask.ui.common.EmptyTaskState
+import com.phuc.synctask.ui.common.AchievementUnlockedDialog
 import com.phuc.synctask.R
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -75,6 +76,7 @@ fun GroupTaskScreen(
     val memberNames by viewModel.memberNames.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val unlockedAchievementId by viewModel.achievementUnlocked.collectAsState()
     val currentUid = viewModel.currentUserId
     val isOwner = currentUid != null && currentUid == group?.ownerId
 
@@ -298,9 +300,16 @@ fun GroupTaskScreen(
         )
     }
 
+    // ─── Dialog thành tựu nhóm ───
+    unlockedAchievementId?.let { id ->
+        AchievementUnlockedDialog(
+            achievementId = id,
+            onDismiss = { viewModel.dismissAchievementDialog() }
+        )
+    }
+
     // ─── Dialog rời / giải tán nhóm ───
-    if (showLeaveDialog) {
-        LeaveGroupDialog(
+    if (showLeaveDialog) {        LeaveGroupDialog(
             isOwner = isOwner,
             groupName = group?.name ?: "nhóm",
             onConfirm = {

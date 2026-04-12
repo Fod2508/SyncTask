@@ -45,6 +45,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import com.phuc.synctask.ui.achievement.AchievementScreen
 import com.phuc.synctask.ui.dashboard.DashboardScreen
 import com.phuc.synctask.ui.group.GroupListScreen
 import com.phuc.synctask.ui.group.GroupTaskScreen
@@ -66,6 +67,7 @@ fun MainScreen(
     val screens = listOf(
         Screen.Personal,
         Screen.Group,
+        Screen.Achievement,
         Screen.Dashboard
     )
 
@@ -183,6 +185,9 @@ fun MainScreen(
             }
             composable(Screen.Dashboard.route) {
                 DashboardScreen()
+            }
+            composable(Screen.Achievement.route) {
+                AchievementScreen()
             }
             composable("group_detail/{groupId}") { backStackEntry ->
                 val groupId = backStackEntry.arguments?.getString("groupId") ?: ""

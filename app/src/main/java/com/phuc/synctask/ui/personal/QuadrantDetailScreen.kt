@@ -38,6 +38,7 @@ import com.phuc.synctask.ui.main.AddTaskBottomSheet
 import com.phuc.synctask.ui.group.TaskDetailBottomSheet
 import com.phuc.synctask.ui.common.DeleteConfirmationDialog
 import com.phuc.synctask.ui.common.EmptyTaskState
+import com.phuc.synctask.ui.common.AchievementUnlockedDialog
 import com.phuc.synctask.viewmodel.HomeViewModel
 import com.phuc.synctask.R
 import java.text.SimpleDateFormat
@@ -66,6 +67,9 @@ fun QuadrantDetailScreen(
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<FirebaseTask?>(null) }
     var taskToDelete by remember { mutableStateOf<FirebaseTask?>(null) }
+
+    // Lắng nghe StateFlow thành tựu
+    val unlockedAchievementId by viewModel.achievementUnlocked.collectAsState()
 
     val bgColor = when (quadrant) {
         Quadrant.DO_NOW -> Color(0xFFFFF0F0)
@@ -311,6 +315,15 @@ fun QuadrantDetailScreen(
             modifier = Modifier.fillMaxSize()
         )
     }
+
+    // Dialog thành tựu mở khóa
+    unlockedAchievementId?.let { id ->
+        AchievementUnlockedDialog(
+            achievementId = id,
+            onDismiss = { viewModel.dismissAchievementDialog() }
+        )
+    }
+
     } // Đóng Box
 }
 

@@ -9,6 +9,8 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.phuc.synctask.model.Group
 import com.phuc.synctask.model.GroupTask
+import com.phuc.synctask.model.UserProfile
+import com.phuc.synctask.utils.AchievementManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +43,15 @@ class GroupTaskViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // Achievement dialog — null = ẩn, non-null = hiện với achievementId
+    private val _achievementUnlocked = MutableStateFlow<String?>(null)
+    val achievementUnlocked: StateFlow<String?> = _achievementUnlocked.asStateFlow()
+
+    fun dismissAchievementDialog() { _achievementUnlocked.value = null }
+
+    // Profile người dùng (chứa danh sách thành tựu + groupTaskCount)
+    private var userProfile = UserProfile()
+
     // Đảm bảo branded loading hiển thị tối thiểu 1500ms
     private var loadStartTime = 0L
 
@@ -53,11 +64,23 @@ class GroupTaskViewModel : ViewModel() {
         currentGroupId = groupId
         loadStartTime = System.currentTimeMillis()
 
-        // Clean up old listeners
         cleanup()
-
+        loadUserProfile()
         listenToGroupInfo(groupId)
         listenToGroupTasks(groupId)
+    }
+
+    private fun loadUserProfile() {
+        val uid = currentUserId ?: return
+        database.reference.child("users").child(uid)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    snapshot.getValue(UserProfile::class.java)?.let {
+                        userProfile = it.copy(uid = uid)
+                    }
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
     }
 
     private fun listenToGroupInfo(groupId: String) {
@@ -182,8 +205,45 @@ class GroupTaskViewModel : ViewModel() {
 
     fun toggleTaskStatus(groupId: String, task: GroupTask) {
         val newStatus = !task.isCompleted
+        val uid = currentUserId ?: return
+        val isOwner = uid == _group.value?.ownerId
+
         database.reference.child("groupTasks").child(groupId).child(task.id)
             .child("isCompleted").setValue(newStatus)
+            .addOnSuccessListener {
+                if (newStatus) {
+                    // Increment groupTaskCount trên Firebase
+                    val newCount = userProfile.groupTaskCount + 1
+                    database.reference.child("users").child(uid)
+                        .child("groupTaskCount").setValue(newCount)
+
+                    // Kiểm tra thành tựu nhóm
+                    AchievementManager.checkAndUnlock(
+                        completedCount = 0,          // không dùng cho huy hiệu nhóm
+                        dueDateMillis  = task.dueDate,
+                        profile        = userProfile,
+                        isGroupTask    = true,
+                        isOwner        = isOwner
+                    ) { achievementId ->
+                        unlockAchievement(uid, achievementId)
+                    }
+
+                    // Cập nhật local profile
+                    userProfile = userProfile.copy(groupTaskCount = newCount)
+                }
+            }
+    }
+
+    private fun unlockAchievement(uid: String, achievementId: String) {
+        // Tránh unlock trùng trong cùng session
+        if (achievementId in userProfile.unlockedAchievements) return
+        userProfile = userProfile.copy(
+            unlockedAchievements = userProfile.unlockedAchievements + achievementId
+        )
+        database.reference.child("users").child(uid)
+            .child("unlockedAchievements")
+            .setValue(userProfile.unlockedAchievements)
+        _achievementUnlocked.value = achievementId
     }
 
     fun deleteGroupTask(groupId: String, taskId: String) {

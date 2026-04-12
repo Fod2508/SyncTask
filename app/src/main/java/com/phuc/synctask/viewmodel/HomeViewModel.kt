@@ -8,6 +8,8 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.phuc.synctask.model.FirebaseTask
+import com.phuc.synctask.model.UserProfile
+import com.phuc.synctask.utils.AchievementManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +49,15 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // Dialog mở khóa thành tựu — null = ẩn, non-null = hiện với achievementId
+    private val _achievementUnlocked = MutableStateFlow<String?>(null)
+    val achievementUnlocked: StateFlow<String?> = _achievementUnlocked.asStateFlow()
+
+    fun dismissAchievementDialog() { _achievementUnlocked.value = null }
+
+    // Profile người dùng (chứa danh sách thành tựu đã mở)
+    private var userProfile = UserProfile()
+
     val completedTasksCount: StateFlow<Int> = _tasks.map { taskList ->
         taskList.count { it.isCompleted }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -84,6 +95,7 @@ class HomeViewModel : ViewModel() {
 
     init {
         listenToTasks()
+        loadUserProfile()
     }
 
     /**
@@ -176,15 +188,65 @@ class HomeViewModel : ViewModel() {
     }
 
     /**
+     * Tải profile người dùng (bao gồm danh sách thành tựu đã mở khóa).
+     * Đường dẫn: /users/{uid}/
+     */
+    private fun loadUserProfile() {
+        val uid = auth.currentUser?.uid ?: return
+        database.reference.child("users").child(uid)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    snapshot.getValue(UserProfile::class.java)?.let {
+                        userProfile = it.copy(uid = uid)
+                    }
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+    }
+
+    /**
      * Đảo trạng thái hoàn thành (isCompleted) của một task.
+     * Nếu task được đánh dấu hoàn thành → kiểm tra thành tựu.
      */
     fun toggleTaskStatus(task: FirebaseTask) {
         val newStatus = !task.isCompleted
         getTasksRef()?.child(task.id)?.child("isCompleted")?.setValue(newStatus)
+            ?.addOnSuccessListener {
+                if (newStatus) {
+                    // Đếm số task đã hoàn thành sau khi toggle
+                    val completedCount = _tasks.value.count { it.isCompleted } +
+                        if (!task.isCompleted) 1 else 0
+
+                    AchievementManager.checkAndUnlock(
+                        completedCount = completedCount,
+                        dueDateMillis  = task.dueDate,
+                        profile        = userProfile
+                    ) { achievementId ->
+                        unlockAchievement(achievementId)
+                    }
+                }
+            }
             ?.addOnFailureListener { e ->
                 _uiState.value =
                     HomeUiState.Error(e.localizedMessage ?: "Cập nhật trạng thái thất bại!")
             }
+    }
+
+    /**
+     * Lưu thành tựu vào /users/{uid}/unlockedAchievements và phát sự kiện ra UI.
+     */
+    private fun unlockAchievement(achievementId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        // Cập nhật local profile ngay để tránh unlock trùng trong cùng session
+        userProfile = userProfile.copy(
+            unlockedAchievements = userProfile.unlockedAchievements + achievementId
+        )
+        // Ghi lên Firebase
+        database.reference.child("users").child(uid)
+            .child("unlockedAchievements")
+            .setValue(userProfile.unlockedAchievements)
+        // Phát sự kiện ra UI — dùng StateFlow, set value trực tiếp
+        _achievementUnlocked.value = achievementId
     }
 
     /**
