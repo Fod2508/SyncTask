@@ -29,6 +29,7 @@ import com.phuc.synctask.viewmodel.HomeUiState
 import com.phuc.synctask.viewmodel.HomeViewModel
 import com.phuc.synctask.ui.main.AddTaskBottomSheet
 import com.phuc.synctask.ui.group.TaskDetailBottomSheet
+import com.phuc.synctask.util.LocalSoundManager
 import kotlinx.coroutines.delay
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
@@ -51,6 +52,7 @@ fun HomeScreen(
 
     var showConfetti by remember { mutableStateOf(false) }
     val achievementQueue by viewModel.achievementQueue.collectAsState()
+    val soundManager = LocalSoundManager.current
 
     LaunchedEffect(showConfetti) {
         if (showConfetti) {
@@ -152,6 +154,7 @@ fun HomeScreen(
                             onToggle = {
                                 if (!task.isCompleted) {
                                     showConfetti = true
+                                    soundManager?.playFireworks()
                                 }
                                 viewModel.toggleTaskStatus(task)
                             },
@@ -211,6 +214,7 @@ fun HomeScreen(
     if (achievementQueue.isNotEmpty()) {
         val currentAchievement = achievementQueue.first()
         LaunchedEffect(currentAchievement) {
+            soundManager?.playAchievement()
             delay(3000L)
             viewModel.dismissCurrentAchievement()
         }

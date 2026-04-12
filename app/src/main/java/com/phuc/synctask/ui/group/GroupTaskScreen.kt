@@ -44,6 +44,7 @@ import com.phuc.synctask.ui.common.AnimatedLoadingScreen
 import com.phuc.synctask.ui.common.DeleteConfirmationDialog
 import com.phuc.synctask.ui.common.EmptyTaskState
 import com.phuc.synctask.ui.common.AchievementUnlockedDialog
+import com.phuc.synctask.util.LocalSoundManager
 import com.phuc.synctask.R
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -85,6 +86,8 @@ fun GroupTaskScreen(
     var selectedTask by remember { mutableStateOf<GroupTask?>(null) }
     var taskToDelete by remember { mutableStateOf<GroupTask?>(null) }
     var showLeaveDialog by remember { mutableStateOf(false) }
+
+    val soundManager = LocalSoundManager.current
 
     var showGroupConfetti by remember { mutableStateOf(false) }
     LaunchedEffect(showGroupConfetti) {
@@ -227,6 +230,7 @@ fun GroupTaskScreen(
                         onToggle = {
                             if (!task.isCompleted) {
                                 showGroupConfetti = true
+                                soundManager?.playFireworks()
                             }
                             viewModel.toggleTaskStatus(groupId, task)
                         },
@@ -304,7 +308,9 @@ fun GroupTaskScreen(
     // ─── Dialog thành tựu nhóm (queue) ───
     if (achievementQueue.isNotEmpty()) {
         val currentAchievement = achievementQueue.first()
+        val soundManager = LocalSoundManager.current
         LaunchedEffect(currentAchievement) {
+            soundManager?.playAchievement()
             delay(3000L)
             viewModel.dismissCurrentAchievement()
         }

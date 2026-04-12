@@ -40,6 +40,7 @@ import com.phuc.synctask.ui.group.TaskDetailBottomSheet
 import com.phuc.synctask.ui.common.DeleteConfirmationDialog
 import com.phuc.synctask.ui.common.EmptyTaskState
 import com.phuc.synctask.ui.common.AchievementUnlockedDialog
+import com.phuc.synctask.util.LocalSoundManager
 import com.phuc.synctask.viewmodel.HomeViewModel
 import com.phuc.synctask.R
 import java.text.SimpleDateFormat
@@ -110,6 +111,7 @@ fun QuadrantDetailScreen(
     }
 
     var showConfetti by remember { mutableStateOf(false) }
+    val soundManager = LocalSoundManager.current
 
     LaunchedEffect(showConfetti) {
         if (showConfetti) {
@@ -222,7 +224,10 @@ fun QuadrantDetailScreen(
                                 accentColor = accentColor,
                                 onDelete = { taskToDelete = task },
                                 onToggle = {
-                                    if (!task.isCompleted) showConfetti = true
+                                    if (!task.isCompleted) {
+                                        showConfetti = true
+                                        soundManager?.playFireworks()
+                                    }
                                     viewModel.toggleTaskStatus(task)
                                 },
                                 onClick = { selectedTask = task }
@@ -320,7 +325,9 @@ fun QuadrantDetailScreen(
     // Dialog thành tựu mở khóa (queue)
     if (achievementQueue.isNotEmpty()) {
         val currentAchievement = achievementQueue.first()
+        val soundManager = LocalSoundManager.current
         LaunchedEffect(currentAchievement) {
+            soundManager?.playAchievement()
             delay(3000L)
             viewModel.dismissCurrentAchievement()
         }
