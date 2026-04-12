@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -577,31 +578,37 @@ private fun ActivityFeedCard(
             ) {
                 // Deadline chip
                 if (task.dueDate != null) {
-                    val sdf = SimpleDateFormat("dd/MM", Locale.getDefault())
+                    val now = System.currentTimeMillis()
+                    val isOverdue = !task.isCompleted && task.dueDate!! < now
+                    val isSoonWarning = !task.isCompleted && !isOverdue && (task.dueDate!! - now) <= 60 * 60 * 1000L
+                    val sdf = SimpleDateFormat("HH:mm, dd 'Th'MM", Locale.getDefault())
                     val dateStr = sdf.format(Date(task.dueDate!!))
-                    val isOverdue = !task.isCompleted && task.dueDate!! < System.currentTimeMillis()
+                    val chipColor = when {
+                        isOverdue -> DangerRed
+                        isSoonWarning -> Color(0xFFE65100)
+                        else -> IndigoPrimary
+                    }
 
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = if (isOverdue) DangerRed.copy(alpha = 0.1f)
-                        else IndigoPrimary.copy(alpha = 0.08f)
+                        color = chipColor.copy(alpha = 0.1f)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                Icons.Filled.CalendarToday,
+                                if (isSoonWarning) Icons.Filled.AccessTime else Icons.Filled.CalendarToday,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
-                                tint = if (isOverdue) DangerRed else IndigoPrimary
+                                tint = chipColor
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 dateStr,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = if (isOverdue) DangerRed else IndigoPrimary
+                                color = chipColor
                             )
                         }
                     }
@@ -665,6 +672,9 @@ private fun AddGroupTaskSheet(
     var description by remember { mutableStateOf("") }
     var dueDate by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var selectedHour by remember { mutableStateOf(9) }
+    var selectedMinute by remember { mutableStateOf(0) }
     var selectedAssigneeId by remember { mutableStateOf<String?>(null) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -714,7 +724,7 @@ private fun AddGroupTaskSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             val dateText = if (dueDate != null) {
-                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
                 "📅 ${sdf.format(Date(dueDate!!))}"
             } else {
                 "📅 Chọn hạn chót"
@@ -726,6 +736,26 @@ private fun AddGroupTaskSheet(
                 shape = MaterialTheme.shapes.medium
             ) {
                 Text(dateText)
+            }
+
+            if (dueDate != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.AccessTime,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = IndigoPrimary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    val timeSdf = SimpleDateFormat("HH:mm, dd 'Th'MM", Locale.getDefault())
+                    Text(
+                        text = "Deadline: ${timeSdf.format(Date(dueDate!!))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = IndigoPrimary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -815,14 +845,58 @@ private fun AddGroupTaskSheet(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    dueDate = datePickerState.selectedDateMillis
+                    datePickerState.selectedDateMillis?.let { dateMillis ->
+                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = dateMillis }
+                        cal.set(java.util.Calendar.HOUR_OF_DAY, selectedHour)
+                        cal.set(java.util.Calendar.MINUTE, selectedMinute)
+                        cal.set(java.util.Calendar.SECOND, 0)
+                        cal.set(java.util.Calendar.MILLISECOND, 0)
+                        dueDate = cal.timeInMillis
+                    }
                     showDatePicker = false
-                }) { Text("Chọn") }
+                    showTimePicker = true
+                }) { Text("Tiếp theo") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Hủy") }
             },
             text = { DatePicker(state = datePickerState) }
+        )
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = selectedHour,
+            initialMinute = selectedMinute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedHour = timePickerState.hour
+                    selectedMinute = timePickerState.minute
+                    dueDate?.let { existingMillis ->
+                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = existingMillis }
+                        cal.set(java.util.Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        cal.set(java.util.Calendar.MINUTE, timePickerState.minute)
+                        cal.set(java.util.Calendar.SECOND, 0)
+                        cal.set(java.util.Calendar.MILLISECOND, 0)
+                        dueDate = cal.timeInMillis
+                    }
+                    showTimePicker = false
+                }) { Text("Xác nhận") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Hủy") }
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("Chọn giờ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TimePicker(state = timePickerState)
+                }
+            }
         )
     }
 }
@@ -878,7 +952,7 @@ fun TaskDetailBottomSheet(
             )
             Spacer(modifier = Modifier.height(4.dp))
             val dateText = if (dueDate != null) {
-                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
                 sdf.format(Date(dueDate))
             } else "Không có hạn chót"
             

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -21,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phuc.synctask.model.FirebaseTask
 import com.phuc.synctask.viewmodel.HomeUiState
@@ -32,6 +34,9 @@ import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -363,6 +368,36 @@ fun TaskCard(
                         else
                             MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // Hiển thị deadline với giờ
+                if (task.dueDate != null && !task.isCompleted) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val now = System.currentTimeMillis()
+                    val isOverdue = task.dueDate!! < now
+                    val isSoonWarning = !isOverdue && (task.dueDate!! - now) <= 60 * 60 * 1000L
+                    val deadlineColor = when {
+                        isOverdue -> MaterialTheme.colorScheme.error
+                        isSoonWarning -> Color(0xFFE65100) // Cam cảnh báo
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    val sdf = SimpleDateFormat("HH:mm, dd 'Th'MM", Locale.getDefault())
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = deadlineColor
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = sdf.format(Date(task.dueDate!!)),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = deadlineColor,
+                            fontWeight = if (isSoonWarning || isOverdue) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    }
                 }
             }
         }

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -396,18 +397,33 @@ fun QuadrantTaskCard(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     thickness = 0.5.dp
                 )
-                val isOverdue = !task.isCompleted && task.dueDate!! < System.currentTimeMillis()
+                val now = System.currentTimeMillis()
+                val isOverdue = !task.isCompleted && task.dueDate!! < now
+                val isSoonWarning = !task.isCompleted && !isOverdue && (task.dueDate!! - now) <= 60 * 60 * 1000L
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isOverdue) {
                         Icon(Icons.Filled.Warning, contentDescription = "Overdue", tint = Color(0xFFD32F2F), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        val diffDays = (System.currentTimeMillis() - task.dueDate!!) / (1000 * 60 * 60 * 24)
-                        Text("Quá hạn $diffDays ngày", fontSize = 12.sp, color = Color(0xFFD32F2F), fontWeight = FontWeight.Bold)
+                        val diffMins = (now - task.dueDate!!) / (1000 * 60)
+                        val overdueText = if (diffMins < 60) "Quá hạn $diffMins phút"
+                                          else "Quá hạn ${diffMins / 60} giờ ${diffMins % 60} phút"
+                        Text(overdueText, fontSize = 12.sp, color = Color(0xFFD32F2F), fontWeight = FontWeight.Bold)
                     } else {
-                        Icon(Icons.Filled.CalendarToday, contentDescription = "Deadline", tint = accentColor.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+                        val deadlineColor = if (isSoonWarning) Color(0xFFE65100) else accentColor.copy(alpha = 0.7f)
+                        Icon(
+                            if (isSoonWarning) Icons.Filled.AccessTime else Icons.Filled.CalendarToday,
+                            contentDescription = "Deadline",
+                            tint = deadlineColor,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                        Text(sdf.format(Date(task.dueDate!!)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val sdf = SimpleDateFormat("HH:mm, dd 'Th'MM", Locale.getDefault())
+                        Text(
+                            sdf.format(Date(task.dueDate!!)),
+                            fontSize = 12.sp,
+                            color = if (isSoonWarning) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isSoonWarning) FontWeight.SemiBold else FontWeight.Normal
+                        )
                     }
                 }
             }

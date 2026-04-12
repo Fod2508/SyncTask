@@ -1,8 +1,11 @@
 package com.phuc.synctask.ui.main
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -10,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.phuc.synctask.model.FirebaseTask
 import com.phuc.synctask.model.Quadrant
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -26,6 +30,9 @@ fun AddTaskBottomSheet(
     var isImportant by remember { mutableStateOf(initialQuadrant == Quadrant.DO_NOW || initialQuadrant == Quadrant.PLAN) }
     var dueDate by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var selectedHour by remember { mutableStateOf(9) }
+    var selectedMinute by remember { mutableStateOf(0) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val datePickerState = rememberDatePickerState()
@@ -114,7 +121,7 @@ fun AddTaskBottomSheet(
 
             // ⑤ Nút chọn deadline
             val dateText = if (dueDate != null) {
-                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
                 "📅 ${sdf.format(Date(dueDate!!))}"
             } else {
                 "📅 Chọn hạn chót"
@@ -126,6 +133,30 @@ fun AddTaskBottomSheet(
                 shape = MaterialTheme.shapes.medium
             ) {
                 Text(dateText)
+            }
+
+            // Hiển thị row giờ đã chọn
+            if (dueDate != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Filled.AccessTime,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    val timeSdf = SimpleDateFormat("HH:mm, dd 'Th'MM", Locale.getDefault())
+                    Text(
+                        text = "Deadline: ${timeSdf.format(Date(dueDate!!))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -160,14 +191,61 @@ fun AddTaskBottomSheet(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    dueDate = datePickerState.selectedDateMillis
+                    datePickerState.selectedDateMillis?.let { dateMillis ->
+                        // Lưu tạm ngày, sau đó mở TimePicker
+                        val cal = Calendar.getInstance().apply { timeInMillis = dateMillis }
+                        cal.set(Calendar.HOUR_OF_DAY, selectedHour)
+                        cal.set(Calendar.MINUTE, selectedMinute)
+                        cal.set(Calendar.SECOND, 0)
+                        cal.set(Calendar.MILLISECOND, 0)
+                        dueDate = cal.timeInMillis
+                    }
                     showDatePicker = false
-                }) { Text("Chọn") }
+                    showTimePicker = true
+                }) { Text("Tiếp theo") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Hủy") }
             },
             text = { DatePicker(state = datePickerState) }
+        )
+    }
+
+    // TimePicker dialog
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = selectedHour,
+            initialMinute = selectedMinute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedHour = timePickerState.hour
+                    selectedMinute = timePickerState.minute
+                    // Gộp ngày đã chọn + giờ mới
+                    dueDate?.let { existingMillis ->
+                        val cal = Calendar.getInstance().apply { timeInMillis = existingMillis }
+                        cal.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        cal.set(Calendar.MINUTE, timePickerState.minute)
+                        cal.set(Calendar.SECOND, 0)
+                        cal.set(Calendar.MILLISECOND, 0)
+                        dueDate = cal.timeInMillis
+                    }
+                    showTimePicker = false
+                }) { Text("Xác nhận") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Hủy") }
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("Chọn giờ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TimePicker(state = timePickerState)
+                }
+            }
         )
     }
 }

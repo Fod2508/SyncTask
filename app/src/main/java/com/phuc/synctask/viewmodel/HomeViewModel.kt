@@ -78,15 +78,9 @@ class HomeViewModel : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val overdueTasksCount: StateFlow<Int> = _tasks.map { taskList ->
-        val todayCalendar = Calendar.getInstance()
-        todayCalendar.set(Calendar.HOUR_OF_DAY, 0)
-        todayCalendar.set(Calendar.MINUTE, 0)
-        todayCalendar.set(Calendar.SECOND, 0)
-        todayCalendar.set(Calendar.MILLISECOND, 0)
-        val startOfTodayMillis = todayCalendar.timeInMillis
-
+        val nowMillis = System.currentTimeMillis()
         taskList.count { task ->
-            !task.isCompleted && task.dueDate != null && task.dueDate!! < startOfTodayMillis
+            !task.isCompleted && task.dueDate != null && task.dueDate!! < nowMillis
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
