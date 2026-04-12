@@ -49,11 +49,13 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // Dialog mở khóa thành tựu — null = ẩn, non-null = hiện với achievementId
-    private val _achievementUnlocked = MutableStateFlow<String?>(null)
-    val achievementUnlocked: StateFlow<String?> = _achievementUnlocked.asStateFlow()
+    // Hàng đợi thành tựu — hỗ trợ hiển thị nhiều huy hiệu liên tiếp
+    private val _achievementQueue = MutableStateFlow<List<String>>(emptyList())
+    val achievementQueue: StateFlow<List<String>> = _achievementQueue.asStateFlow()
 
-    fun dismissAchievementDialog() { _achievementUnlocked.value = null }
+    fun dismissCurrentAchievement() {
+        _achievementQueue.value = _achievementQueue.value.drop(1)
+    }
 
     // Profile người dùng (chứa danh sách thành tựu đã mở)
     private var userProfile = UserProfile()
@@ -239,8 +241,8 @@ class HomeViewModel : ViewModel() {
         database.reference.child("users").child(uid)
             .child("unlockedAchievements")
             .setValue(userProfile.unlockedAchievements)
-        // Phát sự kiện ra UI — dùng StateFlow, set value trực tiếp
-        _achievementUnlocked.value = achievementId
+        // Thêm vào cuối hàng đợi thay vì ghi đè
+        _achievementQueue.value = _achievementQueue.value + achievementId
     }
 
     /**

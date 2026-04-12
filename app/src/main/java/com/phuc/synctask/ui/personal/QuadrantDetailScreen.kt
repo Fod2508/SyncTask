@@ -69,8 +69,8 @@ fun QuadrantDetailScreen(
     var selectedTask by remember { mutableStateOf<FirebaseTask?>(null) }
     var taskToDelete by remember { mutableStateOf<FirebaseTask?>(null) }
 
-    // Lắng nghe StateFlow thành tựu
-    val unlockedAchievementId by viewModel.achievementUnlocked.collectAsState()
+    // Lắng nghe StateFlow thành tựu (queue)
+    val achievementQueue by viewModel.achievementQueue.collectAsState()
 
     val bgColor = when (quadrant) {
         Quadrant.DO_NOW -> Color(0xFFFFF0F0)
@@ -317,11 +317,16 @@ fun QuadrantDetailScreen(
         )
     }
 
-    // Dialog thành tựu mở khóa
-    unlockedAchievementId?.let { id ->
+    // Dialog thành tựu mở khóa (queue)
+    if (achievementQueue.isNotEmpty()) {
+        val currentAchievement = achievementQueue.first()
+        LaunchedEffect(currentAchievement) {
+            delay(3000L)
+            viewModel.dismissCurrentAchievement()
+        }
         AchievementUnlockedDialog(
-            achievementId = id,
-            onDismiss = { viewModel.dismissAchievementDialog() }
+            achievementId = currentAchievement,
+            onDismiss = { viewModel.dismissCurrentAchievement() }
         )
     }
 

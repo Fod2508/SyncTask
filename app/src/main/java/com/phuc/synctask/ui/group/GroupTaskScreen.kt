@@ -77,7 +77,7 @@ fun GroupTaskScreen(
     val memberNames by viewModel.memberNames.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val unlockedAchievementId by viewModel.achievementUnlocked.collectAsState()
+    val achievementQueue by viewModel.achievementQueue.collectAsState()
     val currentUid = viewModel.currentUserId
     val isOwner = currentUid != null && currentUid == group?.ownerId
 
@@ -301,11 +301,16 @@ fun GroupTaskScreen(
         )
     }
 
-    // ─── Dialog thành tựu nhóm ───
-    unlockedAchievementId?.let { id ->
+    // ─── Dialog thành tựu nhóm (queue) ───
+    if (achievementQueue.isNotEmpty()) {
+        val currentAchievement = achievementQueue.first()
+        LaunchedEffect(currentAchievement) {
+            delay(3000L)
+            viewModel.dismissCurrentAchievement()
+        }
         AchievementUnlockedDialog(
-            achievementId = id,
-            onDismiss = { viewModel.dismissAchievementDialog() }
+            achievementId = currentAchievement,
+            onDismiss = { viewModel.dismissCurrentAchievement() }
         )
     }
 

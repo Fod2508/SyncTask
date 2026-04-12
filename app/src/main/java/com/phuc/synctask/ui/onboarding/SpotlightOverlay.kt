@@ -44,155 +44,183 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.phuc.synctask.R
 
-// ─── Model ───────────────────────────────────────────────────────
+// ─── Metadata cho mỗi bước ───────────────────────────────────────
 /**
- * Mỗi bước tutorial mô tả vùng cần spotlight (Rect tuyệt đối từ boundsInRoot)
- * và nội dung tooltip.
- *
- * @param targetBounds  Rect pixel tuyệt đối (boundsInRoot) của vùng cần chiếu sáng.
- *                      null = chưa đo được → dùng fallback toàn màn hình.
- * @param padding       Padding thêm vào xung quanh vùng sáng (px).
- * @param title         Tiêu đề tooltip.
- * @param iconRes       Drawable resource cho icon trong tooltip.
- * @param isEisenhowerStep  true → hiển thị bảng giải thích Eisenhower.
- * @param tooltipBelow  true → tooltip hiện bên dưới vùng sáng, false → bên trên.
+ * Mô tả nội dung tooltip của một bước tutorial.
+ * Tọa độ spotlight được truyền riêng qua [currentTargetBounds].
  */
-data class TutorialStep(
-    val targetBounds: Rect?,
-    val padding: Float = 50f,
+data class TutorialStepMeta(
     val title: String,
-    val iconRes: Int = R.drawable.ic_tutorial_rocket,
-    val isEisenhowerStep: Boolean = false,
-    val tooltipBelow: Boolean = false
+    val description: String,
+    val iconRes: Int = R.drawable.ic_welcome_rocket
+)
+
+// Danh sách metadata 4 bước — Single Source of Truth
+val TUTORIAL_STEPS: List<TutorialStepMeta> = listOf(
+    TutorialStepMeta(
+        title       = "Tab Cá nhân",
+        description = "Quản lý công việc cá nhân theo Ma trận Eisenhower — phân loại theo mức độ Khẩn cấp & Quan trọng để ưu tiên đúng việc.",
+        iconRes     = R.drawable.ic_welcome_rocket
+    ),
+    TutorialStepMeta(
+        title       = "Tab Nhóm",
+        description = "Kết nối, tạo dự án và giao việc cho thành viên trong nhóm theo thời gian thực.",
+        iconRes     = R.drawable.ic_welcome_rocket
+    ),
+    TutorialStepMeta(
+        title       = "Tab Thành tựu",
+        description = "Hoàn thành nhiệm vụ để nhận huy hiệu cực phẩm. Càng nhiều task xong, tên lửa càng bay xa!",
+        iconRes     = R.drawable.ic_welcome_rocket
+    ),
+    TutorialStepMeta(
+        title       = "Tổng quan Dashboard",
+        description = "Theo dõi thống kê công việc hôm nay và trạng thái hoàn thành của bạn tại đây.",
+        iconRes     = R.drawable.ic_welcome_rocket
+    )
 )
 
 // ─── Overlay chính ────────────────────────────────────────────────
+/**
+ * Spotlight overlay responsive 100%.
+ *
+ * @param currentTargetBounds  Rect tuyệt đối (boundsInRoot) của vùng cần chiếu sáng.
+ *                             null → không vẽ lỗ (chờ bounds được đo).
+ * @param currentStep          Index bước hiện tại (0-based).
+ * @param totalSteps           Tổng số bước.
+ * @param screenSize           Kích thước màn hình px.
+ * @param spotlightPadding     Padding px thêm vào xung quanh bounds.
+ * @param onNext               Callback khi bấm "Tiếp theo" / "Hoàn tất".
+ * @param onSkip               Callback khi bấm "Bỏ qua".
+ */
 @Composable
 fun SpotlightOverlay(
-    steps: List<TutorialStep>,
+    currentTargetBounds: Rect?,
     currentStep: Int,
-    screenSize: Size,           // kích thước màn hình tính bằng px (từ LocalDensity)
+    totalSteps: Int,
+    screenSize: Size,
+    spotlightPadding: Float = 20f,
     onNext: () -> Unit,
     onSkip: () -> Unit
 ) {
-    if (currentStep < 0 || currentStep >= steps.size) return
-    val step = steps[currentStep]
+    if (currentStep < 0 || currentStep >= totalSteps) return
 
-    // Tính Rect spotlight có padding, fallback = toàn màn hình
-    val rawRect = step.targetBounds ?: Rect(
-        left   = 0f,
-        top    = 0f,
-        right  = screenSize.width,
-        bottom = screenSize.height
-    )
-    val spotRect = Rect(
-        left   = (rawRect.left   - step.padding).coerceAtLeast(0f),
-        top    = (rawRect.top    - step.padding).coerceAtLeast(0f),
-        right  = (rawRect.right  + step.padding).coerceAtMost(screenSize.width),
-        bottom = (rawRect.bottom + step.padding).coerceAtMost(screenSize.height)
-    )
+    val meta = TUTORIAL_STEPS.getOrNull(currentStep) ?: return
 
-    // Animate các cạnh của Rect để chuyển mượt giữa các bước
-    val animLeft   by animateFloatAsState(spotRect.left,   spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "sl")
-    val animTop    by animateFloatAsState(spotRect.top,    spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "st")
-    val animRight  by animateFloatAsState(spotRect.right,  spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "sr")
-    val animBottom by animateFloatAsState(spotRect.bottom, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "sb")
+    // Tính Rect spotlight có padding
+    val spotRect: Rect? = currentTargetBounds?.let { raw ->
+        Rect(
+            left   = (raw.left   - spotlightPadding).coerceAtLeast(0f),
+            top    = (raw.top    - spotlightPadding).coerceAtLeast(0f),
+            right  = (raw.right  + spotlightPadding).coerceAtMost(screenSize.width),
+            bottom = (raw.bottom + spotlightPadding).coerceAtMost(screenSize.height)
+        )
+    }
+
+    // Fallback khi chưa có bounds: dùng toàn màn hình (overlay tối, chưa đục lỗ)
+    val safeRect = spotRect ?: Rect(0f, 0f, screenSize.width, screenSize.height)
+
+    // Animate 4 cạnh riêng biệt → chuyển bước mượt
+    val animLeft   by animateFloatAsState(safeRect.left,   spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "sl")
+    val animTop    by animateFloatAsState(safeRect.top,    spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "st")
+    val animRight  by animateFloatAsState(safeRect.right,  spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "sr")
+    val animBottom by animateFloatAsState(safeRect.bottom, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow), label = "sb")
 
     val density = LocalDensity.current
 
-    // Tooltip bên dưới hay bên trên?
-    // Nếu step.tooltipBelow = true → luôn hiện bên dưới (ưu tiên tuyệt đối, dùng cho tab bottom bar)
-    // Nếu false → tự động: spotlight ở nửa trên → tooltip bên dưới; nửa dưới → bên trên
-    val tooltipBelow: Boolean = if (step.tooltipBelow) {
-        true
-    } else {
-        animTop < screenSize.height * 0.45f
-    }
-    val spotlightBottomDp: Dp = with(density) { animBottom.toDp() }
-    val spotlightTopDp: Dp    = with(density) { animTop.toDp() }
+    // Vùng sáng ở nửa dưới màn hình → tooltip lên trên; nửa trên → tooltip xuống dưới
+    val targetMidY   = (animTop + animBottom) / 2f
+    val tooltipAbove = targetMidY > screenSize.height * 0.5f
+
+    val spotlightTopDp    = with(density) { animTop.toDp() }
+    val spotlightBottomDp = with(density) { animBottom.toDp() }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ── Lớp tối + lỗ sáng ──
+
+        // ── Lớp tối + đục lỗ sáng ──
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                 .clickable(
-                    indication = null,
+                    indication        = null,
                     interactionSource = remember { MutableInteractionSource() }
                 ) { /* chặn click xuyên qua */ }
         ) {
             // Nền tối
-            drawRect(color = Color.Black.copy(alpha = 0.78f))
-            // Đục lỗ sáng — dùng boundsInRoot nên tọa độ đã tuyệt đối
-            drawRoundRect(
-                color        = Color.Black,
-                topLeft      = Offset(animLeft, animTop),
-                size         = Size(animRight - animLeft, animBottom - animTop),
-                cornerRadius = CornerRadius(24f, 24f),
-                blendMode    = BlendMode.Clear
-            )
+            drawRect(color = Color.Black.copy(alpha = 0.75f))
+
+            // Chỉ đục lỗ khi đã có bounds thực (không phải fallback toàn màn hình)
+            if (currentTargetBounds != null) {
+                val cx     = (animLeft + animRight) / 2f
+                val cy     = (animTop  + animBottom) / 2f
+                val halfW  = (animRight - animLeft) / 2f
+                val halfH  = (animBottom - animTop) / 2f
+                val radius = maxOf(halfW, halfH)
+
+                // Dùng drawRoundRect để lỗ sáng có bo góc đẹp
+                drawRoundRect(
+                    color        = Color.Black,
+                    topLeft      = Offset(animLeft, animTop),
+                    size         = Size(animRight - animLeft, animBottom - animTop),
+                    cornerRadius = CornerRadius(radius * 0.25f, radius * 0.25f),
+                    blendMode    = BlendMode.Clear
+                )
+            }
         }
 
-        // ── Tooltip ──
+        // ── Tooltip card ──
         TooltipCard(
-            step             = step,
-            currentStep      = currentStep,
-            totalSteps       = steps.size,
-            tooltipBelow     = tooltipBelow,
-            spotlightTopDp   = spotlightTopDp,
+            meta              = meta,
+            currentStep       = currentStep,
+            totalSteps        = totalSteps,
+            tooltipAbove      = tooltipAbove,
+            spotlightTopDp    = spotlightTopDp,
             spotlightBottomDp = spotlightBottomDp,
-            onNext           = onNext,
-            onSkip           = onSkip
+            onNext            = onNext,
+            onSkip            = onSkip
         )
     }
 }
 
+// ─── Tooltip Card ─────────────────────────────────────────────────
 @Composable
 private fun TooltipCard(
-    step: TutorialStep,
+    meta: TutorialStepMeta,
     currentStep: Int,
     totalSteps: Int,
-    tooltipBelow: Boolean,
-    spotlightTopDp: Dp,
-    spotlightBottomDp: Dp,
+    tooltipAbove: Boolean,      // true = tooltip nằm phía trên vùng sáng
+    spotlightTopDp: androidx.compose.ui.unit.Dp,
+    spotlightBottomDp: androidx.compose.ui.unit.Dp,
     onNext: () -> Unit,
     onSkip: () -> Unit
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
-        contentAlignment = Alignment.TopCenter
+        modifier          = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+        contentAlignment  = Alignment.TopCenter
     ) {
-        val topPad = if (tooltipBelow) {
-            // Tooltip bên dưới vùng sáng
-            (spotlightBottomDp + 16.dp).coerceAtLeast(120.dp)
-        } else {
-            // Tooltip bên trên vùng sáng — đặt cách đỉnh màn hình 24dp
+        val topPad = if (tooltipAbove) {
+            // Tooltip bên trên vùng sáng → đặt sát đỉnh màn hình
             24.dp
+        } else {
+            // Tooltip bên dưới vùng sáng
+            (spotlightBottomDp + 16.dp).coerceAtLeast(100.dp)
         }
 
         Surface(
             shape          = RoundedCornerShape(24.dp),
             color          = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp,
-            modifier       = Modifier
-                .fillMaxWidth()
-                .padding(top = topPad)
+            modifier       = Modifier.fillMaxWidth().padding(top = topPad)
         ) {
             Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
+                modifier            = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
-                    painter            = painterResource(id = step.iconRes),
+                    painter            = painterResource(id = meta.iconRes),
                     contentDescription = null,
                     modifier           = Modifier.size(72.dp)
                 )
@@ -200,7 +228,7 @@ private fun TooltipCard(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text       = step.title,
+                    text       = meta.title,
                     style      = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
                     textAlign  = TextAlign.Center,
@@ -209,18 +237,19 @@ private fun TooltipCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (step.isEisenhowerStep) {
-                    EisenhowerExplanation()
-                } else {
-                    StepDescription(currentStep)
-                }
+                Text(
+                    text      = meta.description,
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Dots indicator
                 Row(
                     horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier              = Modifier.fillMaxWidth()
                 ) {
                     repeat(totalSteps) { i ->
                         val dotColor = if (i == currentStep)
@@ -244,8 +273,8 @@ private fun TooltipCard(
                     }
                     Button(
                         onClick = onNext,
-                        shape  = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
+                        shape   = RoundedCornerShape(12.dp),
+                        colors  = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
@@ -255,61 +284,5 @@ private fun TooltipCard(
                 }
             }
         }
-    }
-}
-
-// ─── Bước Eisenhower ─────────────────────────────────────────────
-@Composable
-private fun EisenhowerExplanation() {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text      = "Phân loại công việc theo Khẩn cấp & Quan trọng:",
-            style     = MaterialTheme.typography.bodySmall,
-            color     = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        EisenhowerRow("🔴 Làm ngay",     "Vừa gấp vừa quan trọng — làm ngay!",          Color(0xFFD32F2F))
-        EisenhowerRow("🟡 Lên kế hoạch", "Quan trọng, chưa gấp — lên lịch làm sau.",    Color(0xFFF9A825))
-        EisenhowerRow("🔵 Ủy quyền",     "Gấp nhưng không quan trọng — nhờ người khác.", Color(0xFF1976D2))
-        EisenhowerRow("⚫ Loại bỏ",       "Không gấp, không quan trọng — xóa bỏ.",       Color(0xFF757575))
-    }
-}
-
-@Composable
-private fun EisenhowerRow(label: String, desc: String, color: Color) {
-    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            color      = color,
-            modifier   = Modifier.width(116.dp)
-        )
-        Text(
-            text     = desc,
-            style    = MaterialTheme.typography.bodySmall,
-            color    = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-// ─── Mô tả từng bước ─────────────────────────────────────────────
-@Composable
-private fun StepDescription(step: Int) {
-    val text = when (step) {
-        1 -> "Kết nối, tạo dự án và giao việc cho thành viên trong nhóm theo thời gian thực."
-        2 -> "Hoàn thành nhiệm vụ để nhận huy hiệu cực phẩm. Càng nhiều task xong, tên lửa càng bay xa!"
-        3 -> "Tổng quan Dashboard: Theo dõi thống kê công việc hôm nay và trạng thái hoàn thành của bạn tại đây."
-        else -> ""
-    }
-    if (text.isNotEmpty()) {
-        Text(
-            text      = text,
-            style     = MaterialTheme.typography.bodyMedium,
-            color     = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
     }
 }

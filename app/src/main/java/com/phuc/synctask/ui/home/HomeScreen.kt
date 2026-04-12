@@ -50,6 +50,7 @@ fun HomeScreen(
     var selectedTask by remember { mutableStateOf<FirebaseTask?>(null) }
 
     var showConfetti by remember { mutableStateOf(false) }
+    val achievementQueue by viewModel.achievementQueue.collectAsState()
 
     LaunchedEffect(showConfetti) {
         if (showConfetti) {
@@ -203,6 +204,19 @@ fun HomeScreen(
             description = task.description,
             dueDate = task.dueDate,
             onDismiss = { selectedTask = null }
+        )
+    }
+
+    // ─── Achievement queue dialog ───
+    if (achievementQueue.isNotEmpty()) {
+        val currentAchievement = achievementQueue.first()
+        LaunchedEffect(currentAchievement) {
+            delay(3000L)
+            viewModel.dismissCurrentAchievement()
+        }
+        com.phuc.synctask.ui.common.AchievementUnlockedDialog(
+            achievementId = currentAchievement,
+            onDismiss = { viewModel.dismissCurrentAchievement() }
         )
     }
 }
