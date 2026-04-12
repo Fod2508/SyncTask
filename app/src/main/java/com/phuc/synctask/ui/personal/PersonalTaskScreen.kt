@@ -5,6 +5,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import com.phuc.synctask.model.Quadrant
 import com.phuc.synctask.model.quadrant
 import com.phuc.synctask.viewmodel.HomeUiState
@@ -34,7 +39,8 @@ import androidx.compose.ui.graphics.luminance
 @Composable
 fun PersonalTaskScreen(
     viewModel: HomeViewModel = viewModel(),
-    onNavigateToQuadrant: (Quadrant) -> Unit = {}
+    onNavigateToQuadrant: (Quadrant) -> Unit = {},
+    onMatrixPositioned: (Offset, Size) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
@@ -81,7 +87,18 @@ fun PersonalTaskScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Ma trận Ưu tiên
-            Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coords ->
+                        val bounds = coords.boundsInWindow()
+                        onMatrixPositioned(
+                            Offset(bounds.left, bounds.top),
+                            Size(bounds.width, bounds.height)
+                        )
+                    }
+            ) {
                 Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     PriorityCard(
                         title = "Làm Ngay",

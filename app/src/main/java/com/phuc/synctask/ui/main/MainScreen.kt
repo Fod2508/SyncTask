@@ -50,15 +50,26 @@ import com.phuc.synctask.ui.dashboard.DashboardScreen
 import com.phuc.synctask.ui.group.GroupListScreen
 import com.phuc.synctask.ui.group.GroupTaskScreen
 import com.phuc.synctask.ui.navigation.Screen
+import com.phuc.synctask.ui.onboarding.SpotlightOverlay
+import com.phuc.synctask.ui.onboarding.TutorialStep
 import com.phuc.synctask.ui.personal.PersonalTaskScreen
 import com.phuc.synctask.viewmodel.HomeViewModel
 import com.phuc.synctask.viewmodel.ThemeViewModel
 import com.phuc.synctask.model.Quadrant
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     themeViewModel: ThemeViewModel,
+    showTutorial: Boolean = false,
+    onTutorialFinished: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val isDark by themeViewModel.isDarkTheme.collectAsState()
@@ -75,7 +86,15 @@ fun MainScreen(
     val currentDestination = navBackStackEntry?.destination
     val currentRoute = currentDestination?.route
 
-    // Các route cần ẩn TopAppBar và BottomBar
+    // Tutorial state — khởi tạo từ tham số navigation
+    var tutorialStep by remember { mutableStateOf(if (showTutorial) 0 else -1) }
+    val showSpotlight = tutorialStep in 0..2
+
+    // Tọa độ thực từ onGloballyPositioned
+    var matrixBounds  by remember { mutableStateOf<Pair<Offset, Size>?>(null) }
+    var groupTabBounds by remember { mutableStateOf<Pair<Offset, Size>?>(null) }
+    var achieveTabBounds by remember { mutableStateOf<Pair<Offset, Size>?>(null) }
+
     val isDetailRoute = currentRoute == "quadrant_detail/{quadrant}" ||
             currentRoute == "group_detail/{groupId}"
 
@@ -160,7 +179,18 @@ fun MainScreen(
                                     restoreState = true
                                 }
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .onGloballyPositioned { coords ->
+                                    val bounds = coords.boundsInWindow()
+                                    val pos  = Offset(bounds.left, bounds.top)
+                                    val size = Size(bounds.width, bounds.height)
+                                    when (screen) {
+                                        Screen.Group       -> groupTabBounds   = pos to size
+                                        Screen.Achievement -> achieveTabBounds = pos to size
+                                        else               -> Unit
+                                    }
+                                }
                         )
                     }
                 }
@@ -175,7 +205,8 @@ fun MainScreen(
             composable(Screen.Personal.route) {
                 PersonalTaskScreen(
                     viewModel = homeViewModel,
-                    onNavigateToQuadrant = { q -> navController.navigate("quadrant_detail/${q.name}") }
+                    onNavigateToQuadrant = { q -> navController.navigate("quadrant_detail/${q.name}") },
+                    onMatrixPositioned = { offset, size -> matrixBounds = offset to size }
                 )
             }
             composable(Screen.Group.route) {
@@ -218,6 +249,59 @@ fun MainScreen(
                     dueDate = task.dueDate
                 )
                 showAddSheet = false
+            }
+        )
+    }
+
+    // ── Spotlight Tutorial Overlay ──
+    if (showSpotlight) {
+        val density = LocalDensity.current
+        val config  = LocalConfiguration.current
+        val screenW = with(density) { config.screenWidthDp.dp.toPx() }
+        val screenH = with(density) { config.screenHeightDp.dp.toPx() }
+
+        // Fallback nếu tọa độ chưa được đo
+        val matrixOffset = matrixBounds?.first  ?: Offset(16f, screenH * 0.22f)
+        val matrixSize   = matrixBounds?.second ?: Size(screenW - 32f, screenH * 0.52f)
+        val groupOffset  = groupTabBounds?.first  ?: Offset(screenW / 4f, screenH * 0.88f)
+        val groupSize    = groupTabBounds?.second ?: Size(screenW / 4f, screenH * 0.10f)
+        val achOffset    = achieveTabBounds?.first  ?: Offset(screenW / 2f, screenH * 0.88f)
+        val achSize      = achieveTabBounds?.second ?: Size(screenW / 4f, screenH * 0.10f)
+
+        val tutorialSteps = listOf(
+            TutorialStep(
+                spotlightOffset  = matrixOffset,
+                spotlightSize    = matrixSize,
+                title            = "Ma trận Eisenhower là gì?",
+                isEisenhowerStep = true
+            ),
+            TutorialStep(
+                spotlightOffset = groupOffset,
+                spotlightSize   = groupSize,
+                title           = "Tăng tốc cùng đồng đội"
+            ),
+            TutorialStep(
+                spotlightOffset = achOffset,
+                spotlightSize   = achSize,
+                title           = "Phóng tới các cột mốc"
+            )
+        )
+
+        SpotlightOverlay(
+            steps       = tutorialSteps,
+            currentStep = tutorialStep,
+            onNext      = {
+                if (tutorialStep < 2) {
+                    tutorialStep++
+                } else {
+                    // Bước cuối — lưu DataStore rồi đóng overlay
+                    onTutorialFinished()
+                    tutorialStep = -1
+                }
+            },
+            onSkip      = {
+                onTutorialFinished()   // bỏ qua cũng coi như đã xem
+                tutorialStep = -1
             }
         )
     }
