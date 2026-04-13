@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.ksp)
 
     id("com.google.gms.google-services")
 }
@@ -33,6 +32,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -50,10 +50,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
 
-    // Room Persistence Library (KSP for Kotlin)
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
+    // Hỗ trợ thư viện java.time (API 26+) cho các hệ điều hành cũ (minSdk 24)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Gson - JSON parser
     implementation(libs.gson)
@@ -91,6 +89,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
     // Lottie Compose
     implementation(libs.lottie.compose)
@@ -98,6 +97,4 @@ dependencies {
     // DataStore Preferences
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Play Services Auth (Google Sign-In)
-    implementation(libs.play.services.auth)
 }

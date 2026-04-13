@@ -19,9 +19,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SyncTask">
 
-        <!-- AuthActivity là LAUNCHER (Đăng nhập / Đăng ký) -->
+        <!-- MainActivity là entry duy nhất, tự điều phối auth/onboarding/main -->
         <activity
-            android:name=".AuthActivity"
+            android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -29,10 +29,13 @@
             </intent-filter>
         </activity>
 
-        <!-- MainActivity là Dashboard (sau khi đăng nhập) -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="false" />
+        <service
+            android:name=".service.SyncTaskMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
     </application>
 

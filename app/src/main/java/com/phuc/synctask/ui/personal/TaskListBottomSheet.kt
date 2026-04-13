@@ -8,9 +8,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CalendarToday
@@ -44,7 +44,7 @@ fun TaskListBottomSheet(
 
     val title = when (quadrant) { Quadrant.DO_NOW -> "Làm ngay"; Quadrant.PLAN -> "Lên kế hoạch"; Quadrant.DELEGATE -> "Ủy quyền"; Quadrant.ELIMINATE -> "Loại bỏ" }
     val subtitle = when (quadrant) { Quadrant.DO_NOW -> "Khẩn & Quan trọng"; Quadrant.PLAN -> "Quan trọng, Không khẩn"; Quadrant.DELEGATE -> "Khẩn, Không quan trọng"; Quadrant.ELIMINATE -> "Không khẩn & Không quan trọng" }
-    val icon = when (quadrant) { Quadrant.DO_NOW -> Icons.Filled.FlashOn; Quadrant.PLAN -> Icons.Filled.ListAlt; Quadrant.DELEGATE -> Icons.Filled.PersonAdd; Quadrant.ELIMINATE -> Icons.Filled.Block }
+    val icon = when (quadrant) { Quadrant.DO_NOW -> Icons.Filled.FlashOn; Quadrant.PLAN -> Icons.AutoMirrored.Filled.ListAlt; Quadrant.DELEGATE -> Icons.Filled.PersonAdd; Quadrant.ELIMINATE -> Icons.Filled.Block }
     val accentColor = when (quadrant) { Quadrant.DO_NOW -> Color(0xFFD32F2F); Quadrant.PLAN -> Color(0xFF1976D2); Quadrant.DELEGATE -> Color(0xFFE65100); Quadrant.ELIMINATE -> Color(0xFF757575) }
     val lightBgColor = when (quadrant) { Quadrant.DO_NOW -> Color(0xFFFFEBEE); Quadrant.PLAN -> Color(0xFFE3F2FD); Quadrant.DELEGATE -> Color(0xFFFFF3E0); Quadrant.ELIMINATE -> Color(0xFFF5F5F5) }
 
@@ -143,7 +143,7 @@ fun TaskListBottomSheet(
                                             if (task.dueDate != null) {
                                                 Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color(0xFFD32F2F))
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                                                val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
                                                 Text(sdf.format(Date(task.dueDate!!)), style = MaterialTheme.typography.bodySmall, color = Color(0xFFD32F2F))
                                             } else {
                                                 Text("Không có deadline", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))

@@ -1,7 +1,6 @@
 [versions]
-agp = "8.13.2"
-kotlin = "2.1.0"
-ksp = "2.1.0-1.0.29"
+agp = "9.1.0"
+kotlin = "2.2.10"
 composeBom = "2024.12.01"
 activityCompose = "1.9.3"
 navigationCompose = "2.8.4"
@@ -14,7 +13,6 @@ espressoCore = "3.7.0"
 appcompat = "1.7.1"
 material = "1.13.0"
 activity = "1.13.0"
-room = "2.6.1"
 gson = "2.11.0"
 okhttp = "4.12.0"
 konfetti = "2.0.4"
@@ -39,9 +37,6 @@ espresso-core = { group = "androidx.test.espresso", name = "espresso-core", vers
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 konfetti-compose = { group = "nl.dionsegijn", name = "konfetti-compose", version.ref = "konfetti" }
@@ -50,4 +45,3 @@ konfetti-compose = { group = "nl.dionsegijn", name = "konfetti-compose", version
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

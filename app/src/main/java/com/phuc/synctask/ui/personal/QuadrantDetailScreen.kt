@@ -11,17 +11,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +39,6 @@ import com.phuc.synctask.ui.group.TaskDetailBottomSheet
 import com.phuc.synctask.ui.common.DeleteConfirmationDialog
 import com.phuc.synctask.ui.common.EmptyTaskState
 import com.phuc.synctask.ui.common.AchievementUnlockedDialog
-import com.phuc.synctask.util.LocalSoundManager
 import com.phuc.synctask.viewmodel.HomeViewModel
 import com.phuc.synctask.R
 import java.text.SimpleDateFormat
@@ -69,9 +67,11 @@ fun QuadrantDetailScreen(
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<FirebaseTask?>(null) }
     var taskToDelete by remember { mutableStateOf<FirebaseTask?>(null) }
+    var recentlyDeletedTask by remember { mutableStateOf<FirebaseTask?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Lắng nghe StateFlow thành tựu (queue)
-    val achievementQueue by viewModel.achievementQueue.collectAsState()
+    // Lắng nghe StateFlow thành tựu
+    val unlockedAchievementId by viewModel.achievementUnlocked.collectAsState()
 
     val bgColor = when (quadrant) {
         Quadrant.DO_NOW -> Color(0xFFFFF0F0)
@@ -81,7 +81,7 @@ fun QuadrantDetailScreen(
     }
     val qIcon = when (quadrant) {
         Quadrant.DO_NOW -> Icons.Filled.FlashOn
-        Quadrant.PLAN -> Icons.Filled.ListAlt
+        Quadrant.PLAN -> Icons.AutoMirrored.Filled.ListAlt
         Quadrant.DELEGATE -> Icons.Filled.PersonAdd
         Quadrant.ELIMINATE -> Icons.Filled.Block
     }
@@ -111,7 +111,6 @@ fun QuadrantDetailScreen(
     }
 
     var showConfetti by remember { mutableStateOf(false) }
-    val soundManager = LocalSoundManager.current
 
     LaunchedEffect(showConfetti) {
         if (showConfetti) {
@@ -120,9 +119,23 @@ fun QuadrantDetailScreen(
         }
     }
 
+    LaunchedEffect(recentlyDeletedTask?.id) {
+        val deletedTask = recentlyDeletedTask ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Đã xóa task: ${deletedTask.title}",
+            actionLabel = "Hoàn tác",
+            duration = SnackbarDuration.Short
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            viewModel.restoreTask(deletedTask)
+        }
+        recentlyDeletedTask = null
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets(0),
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddSheet = true },
@@ -157,7 +170,7 @@ fun QuadrantDetailScreen(
                             .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
                             .size(40.dp)
                     ) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Box(
@@ -224,10 +237,7 @@ fun QuadrantDetailScreen(
                                 accentColor = accentColor,
                                 onDelete = { taskToDelete = task },
                                 onToggle = {
-                                    if (!task.isCompleted) {
-                                        showConfetti = true
-                                        soundManager?.playFireworks()
-                                    }
+                                    if (!task.isCompleted) showConfetti = true
                                     viewModel.toggleTaskStatus(task)
                                 },
                                 onClick = { selectedTask = task }
@@ -300,6 +310,7 @@ fun QuadrantDetailScreen(
             taskTitle = task.title,
             onConfirm = {
                 viewModel.deleteTask(task.id)
+                recentlyDeletedTask = task
                 taskToDelete = null
             },
             onDismiss = { taskToDelete = null }
@@ -322,18 +333,11 @@ fun QuadrantDetailScreen(
         )
     }
 
-    // Dialog thành tựu mở khóa (queue)
-    if (achievementQueue.isNotEmpty()) {
-        val currentAchievement = achievementQueue.first()
-        val soundManager = LocalSoundManager.current
-        LaunchedEffect(currentAchievement) {
-            soundManager?.playAchievement()
-            delay(3000L)
-            viewModel.dismissCurrentAchievement()
-        }
+    // Dialog thành tựu mở khóa
+    unlockedAchievementId?.let { id ->
         AchievementUnlockedDialog(
-            achievementId = currentAchievement,
-            onDismiss = { viewModel.dismissCurrentAchievement() }
+            achievementId = id,
+            onDismiss = { viewModel.dismissAchievementDialog() }
         )
     }
 
@@ -409,33 +413,18 @@ fun QuadrantTaskCard(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     thickness = 0.5.dp
                 )
-                val now = System.currentTimeMillis()
-                val isOverdue = !task.isCompleted && task.dueDate!! < now
-                val isSoonWarning = !task.isCompleted && !isOverdue && (task.dueDate!! - now) <= 60 * 60 * 1000L
+                val isOverdue = !task.isCompleted && task.dueDate!! < System.currentTimeMillis()
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isOverdue) {
                         Icon(Icons.Filled.Warning, contentDescription = "Overdue", tint = Color(0xFFD32F2F), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        val diffMins = (now - task.dueDate!!) / (1000 * 60)
-                        val overdueText = if (diffMins < 60) "Quá hạn $diffMins phút"
-                                          else "Quá hạn ${diffMins / 60} giờ ${diffMins % 60} phút"
-                        Text(overdueText, fontSize = 12.sp, color = Color(0xFFD32F2F), fontWeight = FontWeight.Bold)
+                        val diffDays = (System.currentTimeMillis() - task.dueDate!!) / (1000 * 60 * 60 * 24)
+                        Text("Quá hạn $diffDays ngày", fontSize = 12.sp, color = Color(0xFFD32F2F), fontWeight = FontWeight.Bold)
                     } else {
-                        val deadlineColor = if (isSoonWarning) Color(0xFFE65100) else accentColor.copy(alpha = 0.7f)
-                        Icon(
-                            if (isSoonWarning) Icons.Filled.AccessTime else Icons.Filled.CalendarToday,
-                            contentDescription = "Deadline",
-                            tint = deadlineColor,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        Icon(Icons.Filled.CalendarToday, contentDescription = "Deadline", tint = accentColor.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        val sdf = SimpleDateFormat("HH:mm, dd 'Th'MM", Locale.getDefault())
-                        Text(
-                            sdf.format(Date(task.dueDate!!)),
-                            fontSize = 12.sp,
-                            color = if (isSoonWarning) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (isSoonWarning) FontWeight.SemiBold else FontWeight.Normal
-                        )
+                        val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
+                        Text(sdf.format(Date(task.dueDate!!)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

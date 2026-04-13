@@ -21,6 +21,18 @@ object AchievementManager {
     const val TEAM_PLAYER_BADGE = "team_player_badge" // Hoàn thành 5 task nhóm
     const val CAPTAIN_BADGE     = "captain_badge"     // Trưởng nhóm hoàn thành task nhóm
 
+    fun getAchievementName(id: String): String = when (id) {
+        ROOKIE_BADGE -> "Tân binh (Hoàn thành task đầu tiên)"
+        NIGHT_OWL_BADGE -> "Cú đêm (Hoàn thành lúc 1–5 giờ sáng)"
+        DILIGENT_BADGE -> "Siêng năng (Hoàn thành 10 task)"
+        WARRIOR_BADGE -> "Chiến binh (Hoàn thành 50 task)"
+        LEGEND_BADGE -> "Huyền thoại (Hoàn thành 200 task)"
+        ON_TIME_BADGE -> "Đúng giờ (Hoàn thành trước hạn)"
+        TEAM_PLAYER_BADGE -> "Đồng đội tốt (Hoàn thành 5 task nhóm)"
+        CAPTAIN_BADGE -> "Đội trưởng mẫu mực"
+        else -> "Thành tựu bí ẩn"
+    }
+
     /**
      * Kiểm tra tất cả điều kiện thành tựu sau khi một task được đánh dấu hoàn thành.
      *

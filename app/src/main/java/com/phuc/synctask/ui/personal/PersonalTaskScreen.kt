@@ -5,15 +5,16 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import com.phuc.synctask.model.Quadrant
 import com.phuc.synctask.model.quadrant
 import com.phuc.synctask.viewmodel.HomeUiState
 import com.phuc.synctask.viewmodel.HomeViewModel
 import com.phuc.synctask.ui.common.AnimatedLoadingScreen
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 
 import androidx.compose.foundation.background
@@ -22,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -38,7 +38,7 @@ import androidx.compose.ui.graphics.luminance
 fun PersonalTaskScreen(
     viewModel: HomeViewModel = viewModel(),
     onNavigateToQuadrant: (Quadrant) -> Unit = {},
-    onMatrixPositioned: (Rect) -> Unit = { _ -> }
+    onMatrixPositioned: (Offset, Size) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
@@ -90,7 +90,11 @@ fun PersonalTaskScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .onGloballyPositioned { coords ->
-                        onMatrixPositioned(coords.boundsInRoot())
+                        val bounds = coords.boundsInWindow()
+                        onMatrixPositioned(
+                            Offset(bounds.left, bounds.top),
+                            Size(bounds.width, bounds.height)
+                        )
                     }
             ) {
                 Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -108,7 +112,7 @@ fun PersonalTaskScreen(
                         title = "Lên Kế Hoạch",
                         subtitle = "Quan trọng, Không khẩn",
                         containerColor = Color(0xFFBBDEFB),
-                        icon = Icons.Filled.ListAlt,
+                        icon = Icons.AutoMirrored.Filled.ListAlt,
                         count = q2Tasks.size,
                         accentColor = Color(0xFF1976D2),
                         modifier = Modifier.weight(1f).fillMaxHeight(),

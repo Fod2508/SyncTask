@@ -3,17 +3,18 @@ package com.phuc.synctask.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.phuc.synctask.data.repository.FirebaseHomeTaskRepository
 import com.phuc.synctask.model.FirebaseTask
 import com.phuc.synctask.model.UserProfile
+import com.phuc.synctask.utils.AppSoundEffect
 import com.phuc.synctask.utils.AchievementManager
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,17 +32,12 @@ sealed class HomeUiState {
 
 /**
  * ViewModel quản lý logic nghiệp vụ cho màn hình Home (danh sách Task).
- * Cấu trúc Firebase: /users/{uid}/tasks/{taskId} → FirebaseTask object
+ * Cấu trúc Firebase: /tasks/{uid}/{taskId} → FirebaseTask object
  */
 class HomeViewModel : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
-    private val database = FirebaseDatabase.getInstance()
-
-    /** Hàm lấy reference tới danh sách task của user hiện tại */
-    private fun getTasksRef() = auth.currentUser?.uid?.let { uid ->
-        database.reference.child("tasks").child(uid)
-    }
+    private val repository = FirebaseHomeTaskRepository()
 
     private val _tasks = MutableStateFlow<List<FirebaseTask>>(emptyList())
     val tasks: StateFlow<List<FirebaseTask>> = _tasks.asStateFlow()
@@ -49,13 +45,14 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // Hàng đợi thành tựu — hỗ trợ hiển thị nhiều huy hiệu liên tiếp
-    private val _achievementQueue = MutableStateFlow<List<String>>(emptyList())
-    val achievementQueue: StateFlow<List<String>> = _achievementQueue.asStateFlow()
+    // Dialog mở khóa thành tựu — null = ẩn, non-null = hiện với achievementId
+    private val _achievementUnlocked = MutableStateFlow<String?>(null)
+    val achievementUnlocked: StateFlow<String?> = _achievementUnlocked.asStateFlow()
 
-    fun dismissCurrentAchievement() {
-        _achievementQueue.value = _achievementQueue.value.drop(1)
-    }
+    private val _soundEvent = MutableSharedFlow<AppSoundEffect>(extraBufferCapacity = 8)
+    val soundEvent: SharedFlow<AppSoundEffect> = _soundEvent.asSharedFlow()
+
+    fun dismissAchievementDialog() { _achievementUnlocked.value = null }
 
     // Profile người dùng (chứa danh sách thành tựu đã mở)
     private var userProfile = UserProfile()
@@ -80,14 +77,20 @@ class HomeViewModel : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val overdueTasksCount: StateFlow<Int> = _tasks.map { taskList ->
-        val nowMillis = System.currentTimeMillis()
+        val todayCalendar = Calendar.getInstance()
+        todayCalendar.set(Calendar.HOUR_OF_DAY, 0)
+        todayCalendar.set(Calendar.MINUTE, 0)
+        todayCalendar.set(Calendar.SECOND, 0)
+        todayCalendar.set(Calendar.MILLISECOND, 0)
+        val startOfTodayMillis = todayCalendar.timeInMillis
+
         taskList.count { task ->
-            !task.isCompleted && task.dueDate != null && task.dueDate!! < nowMillis
+            !task.isCompleted && task.dueDate != null && task.dueDate!! < startOfTodayMillis
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    /** Giữ reference để hủy listener trong onCleared() */
-    private var valueEventListener: ValueEventListener? = null
+    /** Hàm hủy đăng ký lắng nghe tasks */
+    private var cancelTasksObservation: (() -> Unit)? = null
 
     init {
         listenToTasks()
@@ -107,37 +110,21 @@ class HomeViewModel : ViewModel() {
         }
 
         _uiState.value = HomeUiState.Loading
-
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val taskList = mutableListOf<FirebaseTask>()
-                for (child in snapshot.children) {
-                    val task = child.getValue(FirebaseTask::class.java)
-                    if (task != null) {
-                        task.id = child.key ?: ""
-                        taskList.add(task)
-                    }
-                }
-
-                // Sắp xếp theo timestamp mới nhất trước
-                taskList.sortByDescending { it.timestamp }
-
+        cancelTasksObservation?.invoke()
+        cancelTasksObservation = repository.observeTasks(
+            uid = uid,
+            onTasks = { taskList ->
                 _tasks.value = taskList
-
                 _uiState.value = if (taskList.isEmpty()) {
                     HomeUiState.Empty
                 } else {
                     HomeUiState.Success(taskList)
                 }
+            },
+            onError = { message ->
+                _uiState.value = HomeUiState.Error(message)
             }
-
-            override fun onCancelled(error: DatabaseError) {
-                _uiState.value = HomeUiState.Error(error.message)
-            }
-        }
-
-        valueEventListener = listener
-        getTasksRef()?.addValueEventListener(listener)
+        )
     }
 
     /**
@@ -152,11 +139,8 @@ class HomeViewModel : ViewModel() {
         dueDate: Long?
     ) {
         val uid = auth.currentUser?.uid ?: return
-
-        val ref = getTasksRef() ?: return
-        val taskId = ref.push().key ?: return
         val task = FirebaseTask(
-            id = taskId,
+            id = "",
             title = title,
             description = description,
             isCompleted = false,
@@ -167,20 +151,52 @@ class HomeViewModel : ViewModel() {
             dueDate = dueDate
         )
 
-        ref.child(taskId).setValue(task)
-            .addOnFailureListener { e ->
-                _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Thêm task thất bại!")
-            }
+        viewModelScope.launch {
+            repository.addTask(uid, task)
+                .onSuccess {
+                    _soundEvent.tryEmit(AppSoundEffect.TASK_CREATED)
+                    val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
+                    notificationRepo.addNotification(uid, "Khởi tạo thành công", "Bạn vừa tạo mới tác vụ: ${task.title}")
+                }
+                .onFailure { e ->
+                    _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Thêm task thất bại!")
+                    _soundEvent.tryEmit(AppSoundEffect.ERROR)
+                }
+        }
     }
 
     /**
      * Xoá một task khỏi Firebase theo taskId.
      */
     fun deleteTask(taskId: String) {
-        getTasksRef()?.child(taskId)?.removeValue()
-            ?.addOnFailureListener { e ->
-                _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Xoá task thất bại!")
-            }
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            repository.deleteTask(uid, taskId)
+                .onSuccess {
+                    _soundEvent.tryEmit(AppSoundEffect.TASK_DELETED)
+                }
+                .onFailure { e ->
+                    _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Xoá task thất bại!")
+                    _soundEvent.tryEmit(AppSoundEffect.ERROR)
+                }
+        }
+    }
+
+    /**
+     * Khôi phục một task đã xóa bằng cách nạp lại nguyên ID cũ.
+     */
+    fun restoreTask(task: FirebaseTask) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            repository.restoreTask(uid, task)
+                .onSuccess {
+                    _soundEvent.tryEmit(AppSoundEffect.TASK_RESTORED)
+                }
+                .onFailure { e ->
+                    _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Khôi phục task thất bại!")
+                    _soundEvent.tryEmit(AppSoundEffect.ERROR)
+                }
+        }
     }
 
     /**
@@ -189,15 +205,11 @@ class HomeViewModel : ViewModel() {
      */
     private fun loadUserProfile() {
         val uid = auth.currentUser?.uid ?: return
-        database.reference.child("users").child(uid)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    snapshot.getValue(UserProfile::class.java)?.let {
-                        userProfile = it.copy(uid = uid)
-                    }
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+        viewModelScope.launch {
+            repository.loadUserProfile(uid)?.let {
+                userProfile = it
+            }
+        }
     }
 
     /**
@@ -206,25 +218,41 @@ class HomeViewModel : ViewModel() {
      */
     fun toggleTaskStatus(task: FirebaseTask) {
         val newStatus = !task.isCompleted
-        getTasksRef()?.child(task.id)?.child("isCompleted")?.setValue(newStatus)
-            ?.addOnSuccessListener {
-                if (newStatus) {
-                    // Đếm số task đã hoàn thành sau khi toggle
-                    val completedCount = _tasks.value.count { it.isCompleted } +
-                        if (!task.isCompleted) 1 else 0
+        val uid = auth.currentUser?.uid ?: return
 
-                    AchievementManager.checkAndUnlock(
-                        completedCount = completedCount,
-                        dueDateMillis  = task.dueDate,
-                        profile        = userProfile
-                    ) { achievementId ->
-                        unlockAchievement(achievementId)
+        viewModelScope.launch {
+            repository.updateTaskCompleted(uid, task.id, newStatus)
+                .onSuccess {
+                    if (newStatus) {
+                        val completedAt = System.currentTimeMillis()
+                        val isOnTime = task.dueDate == null || completedAt <= task.dueDate!!
+                        val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
+                        if (isOnTime) {
+                            _soundEvent.tryEmit(AppSoundEffect.TASK_COMPLETED_ON_TIME)
+                            notificationRepo.addNotification(uid, "Tuyệt vời!", "Bạn đã hoàn thành tác vụ '${task.title}' đúng hạn!")
+                        } else {
+                            _soundEvent.tryEmit(AppSoundEffect.TASK_COMPLETED_LATE)
+                            notificationRepo.addNotification(uid, "Chia buồn!", "Tác vụ '${task.title}' đã bị trễ hạn mất rồi! Rút kinh nghiệm lần sau nhé!")
+                        }
+
+                        // Đếm số task đã hoàn thành sau khi toggle
+                        val completedCount = _tasks.value.count { it.isCompleted } +
+                            if (!task.isCompleted) 1 else 0
+
+                        AchievementManager.checkAndUnlock(
+                            completedCount = completedCount,
+                            dueDateMillis  = task.dueDate,
+                            profile        = userProfile
+                        ) { achievementId ->
+                            unlockAchievement(achievementId)
+                        }
                     }
                 }
-            }
-            ?.addOnFailureListener { e ->
-                _uiState.value =
-                    HomeUiState.Error(e.localizedMessage ?: "Cập nhật trạng thái thất bại!")
+                .onFailure { e ->
+                    _uiState.value =
+                        HomeUiState.Error(e.localizedMessage ?: "Cập nhật trạng thái thất bại!")
+                    _soundEvent.tryEmit(AppSoundEffect.ERROR)
+                }
             }
     }
 
@@ -238,11 +266,20 @@ class HomeViewModel : ViewModel() {
             unlockedAchievements = userProfile.unlockedAchievements + achievementId
         )
         // Ghi lên Firebase
-        database.reference.child("users").child(uid)
-            .child("unlockedAchievements")
-            .setValue(userProfile.unlockedAchievements)
-        // Thêm vào cuối hàng đợi thay vì ghi đè
-        _achievementQueue.value = _achievementQueue.value + achievementId
+        viewModelScope.launch {
+            repository.saveUnlockedAchievements(uid, userProfile.unlockedAchievements)
+                .onFailure { e ->
+                    _uiState.value = HomeUiState.Error(
+                        e.localizedMessage ?: "Lưu thành tựu thất bại"
+                    )
+                }
+            
+            val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
+            val achievementName = com.phuc.synctask.utils.AchievementManager.getAchievementName(achievementId)
+            notificationRepo.addNotification(uid, "Thành tựu mới!", "Chà, bạn vừa đạt được danh hiệu: $achievementName!")
+        }
+        // Phát sự kiện ra UI — dùng StateFlow, set value trực tiếp
+        _achievementUnlocked.value = achievementId
     }
 
     /**
@@ -250,8 +287,7 @@ class HomeViewModel : ViewModel() {
      */
     override fun onCleared() {
         super.onCleared()
-        valueEventListener?.let { listener ->
-            getTasksRef()?.removeEventListener(listener)
-        }
+        cancelTasksObservation?.invoke()
+        cancelTasksObservation = null
     }
 }

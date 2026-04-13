@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.phuc.synctask.R
+import com.phuc.synctask.utils.AppSoundEffect
+import com.phuc.synctask.utils.AppSoundPlayer
 import com.phuc.synctask.utils.AchievementManager
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Party
@@ -74,7 +76,10 @@ fun AchievementUnlockedDialog(
         ),
         label = "achievement_scale"
     )
-    LaunchedEffect(Unit) { scaleTarget = 1f }
+    LaunchedEffect(Unit) {
+        scaleTarget = 1f
+        AppSoundPlayer.play(AppSoundEffect.ACHIEVEMENT_UNLOCKED)
+    }
 
     // Konfetti parties
     val parties = listOf(

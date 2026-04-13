@@ -1,5 +1,8 @@
 package com.phuc.synctask.ui.auth
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,9 +22,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.airbnb.lottie.compose.*
-import com.phuc.synctask.MainActivity
+
+import com.phuc.synctask.R
+import com.phuc.synctask.utils.AppSoundEffect
+import com.phuc.synctask.utils.AppSoundPlayer
 import com.phuc.synctask.viewmodel.AuthState
 import com.phuc.synctask.viewmodel.AuthViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -32,19 +39,39 @@ fun LoginScreen(
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var resetEmail by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var isSendingReset by remember { mutableStateOf(false) }
 
     val authState by viewModel.authState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+
 
     // Xử lý State của ViewModel
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
+                AppSoundPlayer.play(AppSoundEffect.AUTH_SUCCESS)
                 onLoginSuccess()
             }
             is AuthState.Error -> {
+                AppSoundPlayer.play(AppSoundEffect.ERROR)
                 snackbarHostState.showSnackbar((authState as AuthState.Error).message)
+                if (isSendingReset) {
+                    isSendingReset = false
+                }
+                viewModel.resetState()
+            }
+            is AuthState.PasswordResetSent -> {
+                AppSoundPlayer.play(AppSoundEffect.AUTH_SUCCESS)
+                snackbarHostState.showSnackbar((authState as AuthState.PasswordResetSent).message)
+                if (isSendingReset) {
+                    isSendingReset = false
+                    showForgotPasswordDialog = false
+                }
                 viewModel.resetState()
             }
             else -> {}
@@ -131,7 +158,21 @@ fun LoginScreen(
                 shape = MaterialTheme.shapes.medium
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = {
+                        resetEmail = email
+                        showForgotPasswordDialog = true
+                    }
+                ) {
+                    Text("Quên mật khẩu?")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Button(
                 onClick = { viewModel.loginWithEmail(email, password) },
@@ -152,21 +193,7 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
 
-            // Nút đăng nhập Google nổi bật
-            OutlinedButton(
-                onClick = { /* TODO: Google Sign-In */ },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text("Đăng nhập bằng Google", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -179,5 +206,56 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showForgotPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isSendingReset) {
+                    showForgotPasswordDialog = false
+                }
+            },
+            title = { Text("Khôi phục mật khẩu") },
+            text = {
+                Column {
+                    Text("Nhập email tài khoản để nhận liên kết đặt lại mật khẩu.")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = resetEmail,
+                        onValueChange = { resetEmail = it },
+                        label = { Text("Email") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isSendingReset,
+                    onClick = {
+                        isSendingReset = true
+                        viewModel.sendPasswordResetEmail(resetEmail)
+                    }
+                ) {
+                    if (isSendingReset) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Gửi")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isSendingReset,
+                    onClick = { showForgotPasswordDialog = false }
+                ) {
+                    Text("Hủy")
+                }
+            }
+        )
     }
 }

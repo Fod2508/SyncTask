@@ -3,18 +3,19 @@ package com.phuc.synctask.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.phuc.synctask.data.repository.FirebaseGroupTaskRepository
 import com.phuc.synctask.model.Group
 import com.phuc.synctask.model.GroupTask
 import com.phuc.synctask.model.UserProfile
+import com.phuc.synctask.utils.AppSoundEffect
 import com.phuc.synctask.utils.AchievementManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -23,7 +24,7 @@ import kotlinx.coroutines.launch
 class GroupTaskViewModel : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
-    private val database = FirebaseDatabase.getInstance()
+    private val repository = FirebaseGroupTaskRepository()
 
     val currentUserId: String?
         get() = auth.currentUser?.uid
@@ -43,13 +44,14 @@ class GroupTaskViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // Hàng đợi thành tựu — hỗ trợ hiển thị nhiều huy hiệu liên tiếp
-    private val _achievementQueue = MutableStateFlow<List<String>>(emptyList())
-    val achievementQueue: StateFlow<List<String>> = _achievementQueue.asStateFlow()
+    // Achievement dialog — null = ẩn, non-null = hiện với achievementId
+    private val _achievementUnlocked = MutableStateFlow<String?>(null)
+    val achievementUnlocked: StateFlow<String?> = _achievementUnlocked.asStateFlow()
 
-    fun dismissCurrentAchievement() {
-        _achievementQueue.value = _achievementQueue.value.drop(1)
-    }
+    private val _soundEvent = MutableSharedFlow<AppSoundEffect>(extraBufferCapacity = 8)
+    val soundEvent: SharedFlow<AppSoundEffect> = _soundEvent.asSharedFlow()
+
+    fun dismissAchievementDialog() { _achievementUnlocked.value = null }
 
     // Profile người dùng (chứa danh sách thành tựu + groupTaskCount)
     private var userProfile = UserProfile()
@@ -57,8 +59,8 @@ class GroupTaskViewModel : ViewModel() {
     // Đảm bảo branded loading hiển thị tối thiểu 1500ms
     private var loadStartTime = 0L
 
-    private var groupListener: ValueEventListener? = null
-    private var tasksListener: ValueEventListener? = null
+    private var cancelGroupObservation: (() -> Unit)? = null
+    private var cancelTaskObservation: (() -> Unit)? = null
     private var currentGroupId: String? = null
 
     fun loadGroup(groupId: String) {
@@ -74,65 +76,33 @@ class GroupTaskViewModel : ViewModel() {
 
     private fun loadUserProfile() {
         val uid = currentUserId ?: return
-        database.reference.child("users").child(uid)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    snapshot.getValue(UserProfile::class.java)?.let {
-                        userProfile = it.copy(uid = uid)
-                    }
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+        viewModelScope.launch {
+            repository.loadUserProfile(uid)?.let {
+                userProfile = it
+            }
+        }
     }
 
     private fun listenToGroupInfo(groupId: String) {
-        val ref = database.reference.child("groups").child(groupId)
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val g = snapshot.getValue(Group::class.java)
+        cancelGroupObservation?.invoke()
+        cancelGroupObservation = repository.observeGroupInfo(
+            groupId = groupId,
+            onGroup = { g ->
                 _group.value = g
-                // Fetch member display names
-                g?.members?.let { fetchMemberNames(it) }
-            }
-
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        groupListener = listener
-        ref.addValueEventListener(listener)
-    }
-
-    private fun fetchMemberNames(memberUids: List<String>) {
-        val usersRef = database.reference.child("users")
-        val nameMap = mutableMapOf<String, String>()
-
-        for (uid in memberUids) {
-            usersRef.child(uid).addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val name = snapshot.child("displayName").getValue(String::class.java) ?: "User"
-                    nameMap[uid] = name
-                    // Update state every time a name is fetched
-                    _memberNames.value = nameMap.toMap()
+                viewModelScope.launch {
+                    val memberNames = repository.fetchMemberNames(g?.members ?: emptyList())
+                    _memberNames.value = memberNames
                 }
-
-                override fun onCancelled(error: DatabaseError) {}
-            })
-        }
+            },
+            onError = {}
+        )
     }
 
     private fun listenToGroupTasks(groupId: String) {
-        val ref = database.reference.child("groupTasks").child(groupId)
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val taskList = mutableListOf<GroupTask>()
-                for (child in snapshot.children) {
-                    val task = child.getValue(GroupTask::class.java)
-                    if (task != null) {
-                        task.id = child.key ?: ""
-                        task.groupId = groupId
-                        taskList.add(task)
-                    }
-                }
-                taskList.sortByDescending { it.timestamp }
+        cancelTaskObservation?.invoke()
+        cancelTaskObservation = repository.observeGroupTasks(
+            groupId = groupId,
+            onTasks = { taskList ->
                 _tasks.value = taskList
                 // Branded loading: đảm bảo hiển thị tối thiểu 1500ms
                 viewModelScope.launch {
@@ -141,99 +111,126 @@ class GroupTaskViewModel : ViewModel() {
                     if (remaining > 0) delay(remaining)
                     _isLoading.value = false
                 }
+            },
+            onError = {
+                _isLoading.value = false
             }
-
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        tasksListener = listener
-        ref.addValueEventListener(listener)
+        )
     }
 
     fun addGroupTask(groupId: String, title: String, description: String, dueDate: Long?, assignedToId: String? = null) {
         val uid = currentUserId ?: return
-        val ref = database.reference.child("groupTasks").child(groupId)
-        val taskId = ref.push().key ?: return
-
-        val task = GroupTask(
-            id = taskId,
-            groupId = groupId,
-            title = title,
-            description = description,
-            isCompleted = false,
-            creatorId = uid,
-            assignedToId = assignedToId,
-            timestamp = System.currentTimeMillis(),
-            dueDate = dueDate
-        )
-        ref.child(taskId).setValue(task).addOnSuccessListener {
-            if (assignedToId != null && assignedToId != uid) {
-                sendNotificationToUser(groupId, assignedToId, title)
-            }
+        viewModelScope.launch {
+            repository.addGroupTask(groupId, uid, title, description, dueDate, assignedToId)
+                .onSuccess {
+                    _soundEvent.tryEmit(AppSoundEffect.TASK_CREATED)
+                    val groupName = _group.value?.name ?: "nhóm"
+                    val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
+                    notificationRepo.addNotification(uid, "Task mới tạo xong!", "Tác vụ '$title' trong nhóm '$groupName' đã được khởi tạo thành công.")
+                    if (assignedToId != null && assignedToId != uid) {
+                        sendNotificationToUser(assignedToId, title)
+                    }
+                }
+                .onFailure {
+                    _soundEvent.tryEmit(AppSoundEffect.ERROR)
+                }
         }
     }
 
     fun claimTask(groupId: String, taskId: String) {
         val uid = currentUserId ?: return
-        database.reference.child("groupTasks").child(groupId).child(taskId)
-            .child("assignedToId").setValue(uid)
+        viewModelScope.launch {
+            repository.setTaskAssignee(groupId, taskId, uid)
+                .onSuccess { _soundEvent.tryEmit(AppSoundEffect.TASK_ASSIGNED) }
+                .onFailure { _soundEvent.tryEmit(AppSoundEffect.ERROR) }
+        }
     }
 
     fun assignTask(groupId: String, taskId: String, taskTitle: String, assignedToId: String) {
         val uid = currentUserId ?: return
-        database.reference.child("groupTasks").child(groupId).child(taskId)
-            .child("assignedToId").setValue(assignedToId).addOnSuccessListener {
-                if (assignedToId != uid) {
-                    sendNotificationToUser(groupId, assignedToId, taskTitle)
+        viewModelScope.launch {
+            repository.setTaskAssignee(groupId, taskId, assignedToId)
+                .onSuccess {
+                    _soundEvent.tryEmit(AppSoundEffect.TASK_ASSIGNED)
+                    if (assignedToId != uid) {
+                        sendNotificationToUser(assignedToId, taskTitle)
+                    }
                 }
-            }
+                .onFailure {
+                    _soundEvent.tryEmit(AppSoundEffect.ERROR)
+                }
+        }
     }
 
-    private fun sendNotificationToUser(groupId: String, assignedToId: String, taskTitle: String) {
+    private fun sendNotificationToUser(assignedToId: String, taskTitle: String) {
         val currentUid = currentUserId ?: return
         val currentUserName = _memberNames.value[currentUid] ?: "Ai đó"
         val groupName = _group.value?.name ?: "nhóm"
 
-        // Lấy FCM Token của người được giao và gửi thông báo
-        database.reference.child("users").child(assignedToId).child("fcmToken").get()
-            .addOnSuccessListener { snapshot ->
-                val fcmToken = snapshot.getValue(String::class.java)
-                if (!fcmToken.isNullOrEmpty()) {
-                    val title = "Có công việc mới từ nhóm $groupName"
-                    val body = "$currentUserName vừa phân công cho bạn task: $taskTitle"
-                    com.phuc.synctask.util.NotificationHelper.sendPushNotification(fcmToken, title, body)
-                }
+        viewModelScope.launch {
+            val title = "Có công việc mới từ nhóm $groupName"
+            val body = "$currentUserName vừa phân công cho bạn task: $taskTitle"
+            
+            val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
+            notificationRepo.addNotification(assignedToId, title, body)
+
+            val fcmToken = repository.getUserFcmToken(assignedToId)
+            if (!fcmToken.isNullOrEmpty()) {
+                com.phuc.synctask.util.NotificationHelper.sendPushNotification(fcmToken, title, body)
             }
+        }
     }
 
     fun toggleTaskStatus(groupId: String, task: GroupTask) {
-        val newStatus = !task.isCompleted
         val uid = currentUserId ?: return
         val isOwner = uid == _group.value?.ownerId
+        viewModelScope.launch {
+            repository.toggleTaskStatus(groupId, task.id)
+                .onSuccess { delta ->
+                    if (delta == 0) return@onSuccess
 
-        database.reference.child("groupTasks").child(groupId).child(task.id)
-            .child("isCompleted").setValue(newStatus)
-            .addOnSuccessListener {
-                if (newStatus) {
-                    // Increment groupTaskCount trên Firebase
-                    val newCount = userProfile.groupTaskCount + 1
-                    database.reference.child("users").child(uid)
-                        .child("groupTaskCount").setValue(newCount)
-
-                    // Kiểm tra thành tựu nhóm
-                    AchievementManager.checkAndUnlock(
-                        completedCount = 0,          // không dùng cho huy hiệu nhóm
-                        dueDateMillis  = task.dueDate,
-                        profile        = userProfile,
-                        isGroupTask    = true,
-                        isOwner        = isOwner
-                    ) { achievementId ->
-                        unlockAchievement(uid, achievementId)
+                    if (delta > 0) {
+                        val completedAt = System.currentTimeMillis()
+                        val isOnTime = task.dueDate == null || completedAt <= task.dueDate!!
+                        val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
+                        if (isOnTime) {
+                            _soundEvent.tryEmit(AppSoundEffect.TASK_COMPLETED_ON_TIME)
+                            notificationRepo.addNotification(uid, "Tuyệt vời!", "Bạn đã hoàn thành task nhóm '${task.title}' đúng hạn! Keep it up!")
+                        } else {
+                            _soundEvent.tryEmit(AppSoundEffect.TASK_COMPLETED_LATE)
+                            notificationRepo.addNotification(uid, "Chia buồn!", "Task '${task.title}' đã bị trễ hạn mất rồi! Rút kinh nghiệm lần sau nhé!")
+                        }
                     }
 
-                    // Cập nhật local profile
-                    userProfile = userProfile.copy(groupTaskCount = newCount)
+                    updateGroupTaskCount(uid, delta)
+
+                    if (delta > 0) {
+                        AchievementManager.checkAndUnlock(
+                            completedCount = 0,
+                            dueDateMillis = task.dueDate,
+                            profile = userProfile,
+                            isGroupTask = true,
+                            isOwner = isOwner
+                        ) { achievementId ->
+                            unlockAchievement(uid, achievementId)
+                        }
+                    }
                 }
-            }
+                .onFailure {
+                    _soundEvent.tryEmit(AppSoundEffect.ERROR)
+                }
+        }
+    }
+
+    private fun updateGroupTaskCount(uid: String, delta: Int) {
+        viewModelScope.launch {
+            repository.applyGroupTaskCountDelta(uid, delta)
+                .onSuccess { updated ->
+                    if (updated >= 0) {
+                        userProfile = userProfile.copy(groupTaskCount = updated)
+                    }
+                }
+        }
     }
 
     private fun unlockAchievement(uid: String, achievementId: String) {
@@ -242,15 +239,29 @@ class GroupTaskViewModel : ViewModel() {
         userProfile = userProfile.copy(
             unlockedAchievements = userProfile.unlockedAchievements + achievementId
         )
-        database.reference.child("users").child(uid)
-            .child("unlockedAchievements")
-            .setValue(userProfile.unlockedAchievements)
-        // Thêm vào cuối hàng đợi thay vì ghi đè
-        _achievementQueue.value = _achievementQueue.value + achievementId
+        viewModelScope.launch {
+            repository.saveUnlockedAchievements(uid, userProfile.unlockedAchievements)
+            val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
+            val achievementName = com.phuc.synctask.utils.AchievementManager.getAchievementName(achievementId)
+            notificationRepo.addNotification(uid, "Thành tựu mới!", "Chà, bạn vừa đạt được danh hiệu: $achievementName!")
+        }
+        _achievementUnlocked.value = achievementId
     }
 
     fun deleteGroupTask(groupId: String, taskId: String) {
-        database.reference.child("groupTasks").child(groupId).child(taskId).removeValue()
+        viewModelScope.launch {
+            repository.deleteGroupTask(groupId, taskId)
+                .onSuccess { _soundEvent.tryEmit(AppSoundEffect.TASK_DELETED) }
+                .onFailure { _soundEvent.tryEmit(AppSoundEffect.ERROR) }
+        }
+    }
+
+    fun restoreGroupTask(groupId: String, task: GroupTask) {
+        viewModelScope.launch {
+            repository.restoreGroupTask(groupId, task)
+                .onSuccess { _soundEvent.tryEmit(AppSoundEffect.TASK_RESTORED) }
+                .onFailure { _soundEvent.tryEmit(AppSoundEffect.ERROR) }
+        }
     }
 
     /**
@@ -262,39 +273,24 @@ class GroupTaskViewModel : ViewModel() {
         val uid = currentUserId ?: return
         val isOwner = uid == _group.value?.ownerId
 
-        if (isOwner) {
-            // Xóa tất cả task con trước, rồi xóa group
-            database.reference.child("groupTasks").child(groupId).removeValue()
-                .addOnCompleteListener {
-                    database.reference.child("groups").child(groupId).removeValue()
-                        .addOnCompleteListener { onComplete() }
-                }
-        } else {
-            // Lấy danh sách members hiện tại rồi loại uid ra
-            database.reference.child("groups").child(groupId)
-                .child("members")
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    @Suppress("UNCHECKED_CAST")
-                    val members = (snapshot.value as? List<String>)?.toMutableList()
-                        ?: mutableListOf()
-                    members.remove(uid)
-                    database.reference.child("groups").child(groupId)
-                        .child("members").setValue(members)
-                        .addOnCompleteListener { onComplete() }
-                }
+        viewModelScope.launch {
+            val result = if (isOwner) {
+                repository.deleteGroupAndTasks(groupId)
+            } else {
+                repository.leaveGroup(groupId, uid)
+            }
+
+            if (result.isSuccess) {
+                onComplete()
+            }
         }
     }
 
     private fun cleanup() {
-        currentGroupId?.let { gid ->
-            groupListener?.let {
-                database.reference.child("groups").child(gid).removeEventListener(it)
-            }
-            tasksListener?.let {
-                database.reference.child("groupTasks").child(gid).removeEventListener(it)
-            }
-        }
+        cancelGroupObservation?.invoke()
+        cancelTaskObservation?.invoke()
+        cancelGroupObservation = null
+        cancelTaskObservation = null
     }
 
     override fun onCleared() {

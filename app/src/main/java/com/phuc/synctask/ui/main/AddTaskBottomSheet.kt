@@ -119,7 +119,7 @@ fun AddTaskBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ⑤ Nút chọn deadline
+            // ⑤ Nút chọn deadline (hiển thị cả ngày và giờ)
             val dateText = if (dueDate != null) {
                 val sdf = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault())
                 "📅 ${sdf.format(Date(dueDate!!))}"
@@ -135,7 +135,7 @@ fun AddTaskBottomSheet(
                 Text(dateText)
             }
 
-            // Hiển thị row giờ đã chọn
+            // ⑥ Hiển thị row giờ cụ thể đã chọn (icon đồng hồ)
             if (dueDate != null) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -161,7 +161,7 @@ fun AddTaskBottomSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ⑥ Nút Lưu Công Việc
+            // ⑦ Nút Lưu Công Việc
             Button(
                 onClick = {
                     val task = FirebaseTask(
@@ -185,14 +185,14 @@ fun AddTaskBottomSheet(
         }
     }
 
-    // DatePicker dialog (Material 3)
+    // DatePicker dialog (Material 3) — sau khi chọn ngày, mở TimePicker
     if (showDatePicker) {
         AlertDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { dateMillis ->
-                        // Lưu tạm ngày, sau đó mở TimePicker
+                        // Lưu tạm ngày + giờ mặc định, sau đó mở TimePicker để user chỉnh giờ
                         val cal = Calendar.getInstance().apply { timeInMillis = dateMillis }
                         cal.set(Calendar.HOUR_OF_DAY, selectedHour)
                         cal.set(Calendar.MINUTE, selectedMinute)
@@ -211,7 +211,7 @@ fun AddTaskBottomSheet(
         )
     }
 
-    // TimePicker dialog
+    // TimePicker dialog — chọn giờ cụ thể cho deadline
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState(
             initialHour = selectedHour,
@@ -224,7 +224,7 @@ fun AddTaskBottomSheet(
                 TextButton(onClick = {
                     selectedHour = timePickerState.hour
                     selectedMinute = timePickerState.minute
-                    // Gộp ngày đã chọn + giờ mới
+                    // Gộp ngày đã chọn + giờ mới của user
                     dueDate?.let { existingMillis ->
                         val cal = Calendar.getInstance().apply { timeInMillis = existingMillis }
                         cal.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
@@ -240,8 +240,15 @@ fun AddTaskBottomSheet(
                 TextButton(onClick = { showTimePicker = false }) { Text("Hủy") }
             },
             text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text("Chọn giờ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Chọn giờ deadline",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     TimePicker(state = timePickerState)
                 }

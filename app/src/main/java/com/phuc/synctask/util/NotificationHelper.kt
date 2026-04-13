@@ -25,7 +25,7 @@ object NotificationHelper {
     // 4. Bấm "Exchange authorization code for tokens".
     // 5. Copy chuỗi "Access token" và dán vào biến dưới đây. Token này sống được 1 giờ.
     // LƯU Ý: Trong production, Server (Backend) là nơi tạo OAuth2 token từ Service Account JSON, Client không nên chứa logic này.
-    private const val OAUTH2_TOKEN = "ya29.YOUR_TEMPORARY_OAUTH2_TOKEN_HERE"
+    private const val OAUTH2_TOKEN = ""
 
     private val client = OkHttpClient()
 
@@ -34,6 +34,11 @@ object NotificationHelper {
      */
     fun sendPushNotification(targetToken: String, title: String, body: String) {
         if (targetToken.isEmpty()) return
+
+        if (FCM_API_URL.contains("YOUR_PROJECT_ID") || OAUTH2_TOKEN.isBlank()) {
+            Log.w(TAG, "FCM sender is not configured. Skip push send on client.")
+            return
+        }
 
         val jsonPayload = JSONObject().apply {
             put("message", JSONObject().apply {

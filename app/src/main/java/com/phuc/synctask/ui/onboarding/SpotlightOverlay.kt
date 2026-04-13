@@ -46,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.phuc.synctask.R
+import com.phuc.synctask.utils.AppSoundEffect
+import com.phuc.synctask.utils.AppSoundPlayer
 
 // ─── Metadata cho mỗi bước ───────────────────────────────────────
 /**
@@ -55,7 +57,7 @@ import com.phuc.synctask.R
 data class TutorialStepMeta(
     val title: String,
     val description: String,
-    val iconRes: Int = R.drawable.ic_welcome_rocket
+    val iconRes: Int = R.drawable.ic_tutorial_rocket
 )
 
 // Danh sách metadata 4 bước — Single Source of Truth
@@ -63,22 +65,22 @@ val TUTORIAL_STEPS: List<TutorialStepMeta> = listOf(
     TutorialStepMeta(
         title       = "Tab Cá nhân",
         description = "Quản lý công việc cá nhân theo Ma trận Eisenhower — phân loại theo mức độ Khẩn cấp & Quan trọng để ưu tiên đúng việc.",
-        iconRes     = R.drawable.ic_welcome_rocket
+        iconRes     = R.drawable.ic_tutorial_rocket
     ),
     TutorialStepMeta(
         title       = "Tab Nhóm",
         description = "Kết nối, tạo dự án và giao việc cho thành viên trong nhóm theo thời gian thực.",
-        iconRes     = R.drawable.ic_welcome_rocket
+        iconRes     = R.drawable.ic_tutorial_rocket
     ),
     TutorialStepMeta(
         title       = "Tab Thành tựu",
         description = "Hoàn thành nhiệm vụ để nhận huy hiệu cực phẩm. Càng nhiều task xong, tên lửa càng bay xa!",
-        iconRes     = R.drawable.ic_welcome_rocket
+        iconRes     = R.drawable.ic_tutorial_rocket
     ),
     TutorialStepMeta(
         title       = "Tổng quan Dashboard",
         description = "Theo dõi thống kê công việc hôm nay và trạng thái hoàn thành của bạn tại đây.",
-        iconRes     = R.drawable.ic_welcome_rocket
+        iconRes     = R.drawable.ic_tutorial_rocket
     )
 )
 
@@ -268,11 +270,17 @@ private fun TooltipCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onSkip) {
+                    TextButton(onClick = {
+                        AppSoundPlayer.play(AppSoundEffect.TASK_CREATED)
+                        onSkip()
+                    }) {
                         Text("Bỏ qua", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Button(
-                        onClick = onNext,
+                        onClick = {
+                            AppSoundPlayer.play(AppSoundEffect.NOTIFICATION)
+                            onNext()
+                        },
                         shape   = RoundedCornerShape(12.dp),
                         colors  = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary

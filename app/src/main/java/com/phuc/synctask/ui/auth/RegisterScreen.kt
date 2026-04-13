@@ -19,6 +19,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.airbnb.lottie.compose.*
+import com.phuc.synctask.utils.AppSoundEffect
+import com.phuc.synctask.utils.AppSoundPlayer
 import com.phuc.synctask.viewmodel.AuthState
 import com.phuc.synctask.viewmodel.AuthViewModel
 
@@ -28,22 +30,31 @@ fun RegisterScreen(
     onNavigateToLogin: () -> Unit,
     onRegisterSuccess: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
     val authState by viewModel.authState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Xử lý State của ViewModel
     LaunchedEffect(authState) {
         when (authState) {
+            is AuthState.RegisterSuccess -> {
+                AppSoundPlayer.play(AppSoundEffect.AUTH_SUCCESS)
+                android.widget.Toast.makeText(context, (authState as AuthState.RegisterSuccess).message, android.widget.Toast.LENGTH_LONG).show()
+                viewModel.resetState()
+                onNavigateToLogin()
+            }
             is AuthState.Success -> {
+                AppSoundPlayer.play(AppSoundEffect.AUTH_SUCCESS)
                 onRegisterSuccess()
             }
             is AuthState.Error -> {
+                AppSoundPlayer.play(AppSoundEffect.ERROR)
                 snackbarHostState.showSnackbar((authState as AuthState.Error).message)
                 viewModel.resetState()
             }
@@ -140,10 +151,26 @@ fun RegisterScreen(
                 shape = MaterialTheme.shapes.medium
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = {
+                    confirmPassword = it
+                    if (authState is AuthState.Error) viewModel.resetState()
+                },
+                label = { Text("Xác nhận mật khẩu") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { viewModel.registerWithEmail(fullName, email, password) },
+                onClick = { viewModel.registerWithEmail(fullName, email, password, confirmPassword) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),

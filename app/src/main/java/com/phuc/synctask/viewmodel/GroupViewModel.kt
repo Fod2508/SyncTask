@@ -3,15 +3,12 @@ package com.phuc.synctask.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.phuc.synctask.data.repository.FirebaseGroupRepository
+import com.phuc.synctask.data.repository.JoinGroupStatus
 import com.phuc.synctask.model.Group
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
 
 sealed class GroupUiState {
@@ -24,8 +21,8 @@ sealed class GroupUiState {
 class GroupViewModel : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
-    private val database = FirebaseDatabase.getInstance()
-    private val groupsRef = database.reference.child("groups")
+    private val repository = FirebaseGroupRepository()
+    private val notificationRepo = com.phuc.synctask.data.repository.FirebaseNotificationRepository()
 
     val currentUserId: String?
         get() = auth.currentUser?.uid
@@ -36,7 +33,7 @@ class GroupViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<GroupUiState>(GroupUiState.Loading)
     val uiState: StateFlow<GroupUiState> = _uiState.asStateFlow()
 
-    private var valueEventListener: ValueEventListener? = null
+    private var cancelGroupObservation: (() -> Unit)? = null
 
     private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
         if (firebaseAuth.currentUser != null) {
@@ -61,36 +58,21 @@ class GroupViewModel : ViewModel() {
         }
 
         _uiState.value = GroupUiState.Loading
-
-        // Remove old listener if exists
-        valueEventListener?.let { groupsRef.removeEventListener(it) }
-
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val groupList = mutableListOf<Group>()
-                for (child in snapshot.children) {
-                    val group = child.getValue(Group::class.java)
-                    if (group != null && group.members.contains(uid)) {
-                        groupList.add(group)
-                    }
-                }
-
+        cancelGroupObservation?.invoke()
+        cancelGroupObservation = repository.observeUserGroups(
+            uid = uid,
+            onGroups = { groupList ->
                 _groups.value = groupList
-
                 _uiState.value = if (groupList.isEmpty()) {
                     GroupUiState.Empty
                 } else {
                     GroupUiState.Success(groupList)
                 }
+            },
+            onError = { message ->
+                _uiState.value = GroupUiState.Error(message)
             }
-
-            override fun onCancelled(error: DatabaseError) {
-                _uiState.value = GroupUiState.Error(error.message)
-            }
-        }
-
-        valueEventListener = listener
-        groupsRef.addValueEventListener(listener)
+        )
     }
 
     fun createGroup(name: String, onResult: (Boolean, String) -> Unit) {
@@ -100,25 +82,16 @@ class GroupViewModel : ViewModel() {
             return
         }
 
-        val inviteCode = generateInviteCode()
-        val newGroupRef = groupsRef.push()
-        val groupId = newGroupRef.key ?: return
-
-        val newGroup = Group(
-            id = groupId,
-            name = name,
-            inviteCode = inviteCode,
-            ownerId = uid,
-            members = listOf(uid)
-        )
-
-        newGroupRef.setValue(newGroup)
-            .addOnSuccessListener {
-                onResult(true, "Tạo nhóm thành công! Mã mời: $inviteCode")
-            }
-            .addOnFailureListener { e ->
-                onResult(false, e.localizedMessage ?: "Tạo nhóm thất bại.")
-            }
+        viewModelScope.launch {
+            repository.createGroup(uid, name)
+                .onSuccess { inviteCode ->
+                    notificationRepo.addNotification(uid, "Tạo nhóm thành công", "Bạn đã tạo nhóm $name. Mã mời: $inviteCode")
+                    onResult(true, "Tạo nhóm thành công! Mã mời: $inviteCode")
+                }
+                .onFailure { e ->
+                    onResult(false, e.localizedMessage ?: "Tạo nhóm thất bại.")
+                }
+        }
     }
 
     fun joinGroup(inviteCode: String, onResult: (Boolean, String) -> Unit) {
@@ -128,54 +101,32 @@ class GroupViewModel : ViewModel() {
             return
         }
 
-        groupsRef.orderByChild("inviteCode").equalTo(inviteCode).addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    for (child in snapshot.children) {
-                        val group = child.getValue(Group::class.java)
-                        if (group != null) {
-                            if (group.members.contains(uid)) {
-                                onResult(false, "Bạn đã ở trong nhóm này rồi.")
-                                return
-                            }
-                            
-                            // Cập nhật members list
-                            val updatedMembers = group.members.toMutableList()
-                            updatedMembers.add(uid)
-                            
-                            child.ref.child("members").setValue(updatedMembers)
-                                .addOnSuccessListener {
-                                    onResult(true, "Tham gia nhóm thành công!")
-                                }
-                                .addOnFailureListener { e ->
-                                    onResult(false, e.localizedMessage ?: "Lỗi khi cập nhật danh sách thành viên.")
-                                }
-                            return
+        viewModelScope.launch {
+            repository.joinGroup(uid, inviteCode.uppercase())
+                .onSuccess { status ->
+                    when (status) {
+                        is JoinGroupStatus.Joined -> {
+                            notificationRepo.addNotification(
+                                status.ownerId, 
+                                "Thành viên mới", 
+                                "Một thành viên vừa tham gia nhóm ${status.groupName} của bạn qua mã mời"
+                            )
+                            onResult(true, "Tham gia nhóm thành công!")
                         }
+                        is JoinGroupStatus.AlreadyMember -> onResult(false, "Bạn đã ở trong nhóm này rồi.")
+                        is JoinGroupStatus.NotFound -> onResult(false, "Mã mời không chính xác hoặc nhóm không tồn tại.")
                     }
-                } else {
-                    onResult(false, "Mã mời không chính xác hoặc nhóm không tồn tại.")
                 }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                onResult(false, error.message)
-            }
-        })
-    }
-
-    private fun generateInviteCode(): String {
-        val allowedChars = ('A'..'Z') + ('0'..'9')
-        return (1..6)
-            .map { allowedChars.random() }
-            .joinToString("")
+                .onFailure { e ->
+                    onResult(false, e.localizedMessage ?: "Tham gia nhóm thất bại.")
+                }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         auth.removeAuthStateListener(authStateListener)
-        valueEventListener?.let { listener ->
-            groupsRef.removeEventListener(listener)
-        }
+        cancelGroupObservation?.invoke()
+        cancelGroupObservation = null
     }
 }

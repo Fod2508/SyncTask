@@ -213,8 +213,10 @@ fun CreateGroupDialog(viewModel: GroupViewModel, onDismiss: () -> Unit) {
                         viewModel.createGroup(groupName) { success, msg ->
                             resultMessage = msg
                             if (success) {
-                                // Wait a bit then dismiss
+                                com.phuc.synctask.utils.AppSoundPlayer.play(com.phuc.synctask.utils.AppSoundEffect.AUTH_SUCCESS)
                                 onDismiss()
+                            } else {
+                                com.phuc.synctask.utils.AppSoundPlayer.play(com.phuc.synctask.utils.AppSoundEffect.ERROR)
                             }
                         }
                     }
@@ -266,7 +268,10 @@ fun JoinGroupDialog(viewModel: GroupViewModel, onDismiss: () -> Unit) {
                             isError = !success
                             resultMessage = msg
                             if (success) {
+                                com.phuc.synctask.utils.AppSoundPlayer.play(com.phuc.synctask.utils.AppSoundEffect.AUTH_SUCCESS)
                                 onDismiss()
+                            } else {
+                                com.phuc.synctask.utils.AppSoundPlayer.play(com.phuc.synctask.utils.AppSoundEffect.ERROR)
                             }
                         }
                     }
