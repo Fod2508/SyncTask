@@ -51,7 +51,7 @@ fun HomeScreen(
     var selectedTask by remember { mutableStateOf<FirebaseTask?>(null) }
 
     var showConfetti by remember { mutableStateOf(false) }
-    val achievementQueue by viewModel.achievementQueue.collectAsState()
+    val achievementUnlocked by viewModel.achievementUnlocked.collectAsState()
     val soundManager = LocalSoundManager.current
 
     LaunchedEffect(showConfetti) {
@@ -210,17 +210,16 @@ fun HomeScreen(
         )
     }
 
-    // ─── Achievement queue dialog ───
-    if (achievementQueue.isNotEmpty()) {
-        val currentAchievement = achievementQueue.first()
+    // ─── Achievement dialog ───
+    achievementUnlocked?.let { currentAchievement ->
         LaunchedEffect(currentAchievement) {
             soundManager?.playAchievement()
             delay(3000L)
-            viewModel.dismissCurrentAchievement()
+            viewModel.dismissAchievementDialog()
         }
         com.phuc.synctask.ui.common.AchievementUnlockedDialog(
             achievementId = currentAchievement,
-            onDismiss = { viewModel.dismissCurrentAchievement() }
+            onDismiss = { viewModel.dismissAchievementDialog() }
         )
     }
 }
